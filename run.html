@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en">
+        <head>
+                <title>three.js canvas - camera - orthographic</title>
+                <meta charset="utf-8">
+                <meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+                <style>
+                        body {
+                                font-family: Monospace;
+                                background-color: #f0f0f0;
+                                margin: 0px;
+                                overflow: hidden;
+                        }
+                </style>
+        </head>
+        <body>
+
+                <script src="three.js"></script>
+                <script src="FirstPersonControls.js"></script>
+                <script src="perlin.js"></script>
+				<script type="x-shader/x-vertex" id="vertexshader">
+
+                        void main() {
+                                vec4 mvPosition = modelViewMatrix * vec4( position, 1.0 );
+                                gl_Position = projectionMatrix * mvPosition;
+                        }
+
+                </script>
+
+                <script type="x-shader/x-fragment" id="fragmentshader">
+
+                        void main() {
+                                gl_FragColor = vec4(1.0,0.0,0.0,1.0);
+                        }
+
+                </script>
+				
+                <script>
+
+                        var container;
+                        var camera, scene, renderer;
+						var controls;
+						var last_d = 0;
+						var tiles = [];
+
+						var TILES_X = 1;
+						var TILES_Z = 1;
+
+						var TILE_X_SIZE = 100;
+						var TILE_Z_SIZE = 100;
+
+						var TILE_LEVELS = 1;
+
+						// each tile is 100x100 cell, with 10 levels of detail, we're gonna have a 50x50 tile area
+						//
+
+						noise.seed(Math.random());
+
+                        init();
+                        animate();
+
+						function generatePerlinPoints(minx, minz, maxx, maxz, level) {
+							var stepX = (TILE_LEVELS - level + 1);
+							var stepY = (TILE_LEVELS - level + 1);
+
+							var points = [];
+							for (var z = 0 ; z < TILE_Z_SIZE ; z += stepY) {
+								for (var x = 0 ; x < TILE_X_SIZE ; x += stepX) {
+									var _x = minx + (maxx - minx) * (x / TILE_X_SIZE);
+									var _z = minz + (maxz - minz) * (z / TILE_Z_SIZE);
+									var y = noise.perlin2(_x * 0.001, _z * 0.001) * 10;
+
+									console.log(_x, _z, '=', y);
+
+									points.push(x);
+									points.push(y);
+									points.push(z);
+								}
+							}
+
+							return points;
+						}
+
+						function setupTiles(scene) {
+							var shaderMaterial = new THREE.ShaderMaterial( {
+
+                                vertexShader:   document.getElementById( 'vertexshader' ).textContent,
+                                fragmentShader: document.getElementById( 'fragmentshader' ).textContent,
+
+							});
+
+							var material = new THREE.ParticleSystemMaterial( { size: 1, vertexColors: false } );
+
+							for (var j = 0 ; j < TILES_Z ; j++) {
+								for(var i = 0 ; i < TILES_X ; i++) {
+									var x = (i - (TILES_X/2)) * TILE_X_SIZE;
+									var z = (j - (TILES_Z/2)) * TILE_Z_SIZE;
+
+									var levels = [];
+
+									for (var l = 0 ; l < TILE_LEVELS ; l ++) {
+										var points = generatePerlinPoints(x, z, x + TILE_X_SIZE, z + TILE_Z_SIZE, l+1);
+										console.log(points);
+
+										var geometry = new THREE.BufferGeometry();
+										geometry.addAttribute( 'position', Float32Array, points.length / 3, 3 );
+
+										var positions = geometry.attributes.position.array;
+										for (var c = 0, cl = points.length ; c < cl ; c++) {
+											positions[c] = points[c];
+										}
+
+										var sys = new THREE.ParticleSystem(geometry, material);
+
+										levels.push(sys);
+										scene.add(sys);
+
+										// not visible by default
+										//sys.visible = false;
+										sys.position.set(x, 0, z);
+									}
+
+									tiles.push({
+										levels: levels,
+										x: x,
+										y: 0,
+										z: z,
+										sizex: TILE_X_SIZE,
+										sizez: TILE_Z_SIZE
+									});
+								}
+							}
+						}
+
+                        function init() {
+
+                                container = document.createElement( 'div' );
+                                document.body.appendChild( container );
+
+                                var info = document.createElement( 'div' );
+                                info.style.position = 'absolute';
+                                info.style.top = '10px';
+                                info.style.width = '100%';
+                                info.style.textAlign = 'center';
+                                info.innerHTML = '<a href="http://threejs.org" target="_blank">three.js</a> - orthographic view';
+                                container.appendChild( info );
+
+								var width = window.innerWidth;
+								var height = window.innerHeight;
+
+                                camera = new THREE.PerspectiveCamera(45, width / height, 1, 10000);
+								camera.position.set(0, 50, 0);
+								controls = new THREE.FirstPersonControls(camera);
+								controls.lookSpeed = 0.0001;
+
+                                scene = new THREE.Scene();
+
+								setupTiles(scene);
+								console.log(tiles);
+
+                                renderer = new THREE.WebGLRenderer();
+								renderer.setClearColor("#111");
+                                renderer.setSize( window.innerWidth, window.innerHeight );
+
+                                container.appendChild( renderer.domElement );
+
+                                window.addEventListener( 'resize', onWindowResize, false );
+                        }
+
+                        function onWindowResize() {
+
+                                camera.left = window.innerWidth / - 2;
+                                camera.right = window.innerWidth / 2;
+                                camera.top = window.innerHeight / 2;
+                                camera.bottom = window.innerHeight / - 2;
+
+                                camera.updateProjectionMatrix();
+
+                                renderer.setSize( window.innerWidth, window.innerHeight );
+
+                        }
+
+                        function animate() {
+							var thisTime = (new Date()).getTime();
+							var d = (last_d === 0 ? 0 : (thisTime - last_d));
+							last_d = thisTime;
+
+							requestAnimationFrame( animate );
+							render(d);
+                        }
+
+                        function render(delta) {
+							controls.update(delta);
+							renderer.render( scene, camera );
+                        }
+
+                </script>
+
+        </body>
+</html>
+ 
