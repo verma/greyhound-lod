@@ -38,11 +38,12 @@
 		var y = this.y;
 		var w = this.w;
 		var h = this.h;
+	
 
-		this.children.push(new Node(x, y, w/2, h/2));
-		this.children.push(new Node(x+w/2, y, w/2, h/2));
-		this.children.push(new Node(x, y+h/2, w/2, h/2));
-		this.children.push(new Node(x+w/2, y+h/2, w/2, h/2));
+		this.children.push(new Node(x, y, w/2, h/2, d));
+		this.children.push(new Node(x+w/2, y, w/2, h/2, d));
+		this.children.push(new Node(x, y+h/2, w/2, h/2, d));
+		this.children.push(new Node(x+w/2, y+h/2, w/2, h/2, d));
 
 		this.children[0].subdivide(d - 1);
 		this.children[1].subdivide(d - 1);
@@ -71,12 +72,10 @@
 		for (var i = 0 ; i < this.children.length ; i++) {
 			var c = this.children[i];
 
+			callback(c); // emit current cell at current depth (or LOD)
 			if (doesCubeIntersectSphere({x: c.x, y: c.y}, {x: c.x+c.w, y: c.y+c.h},
 				eye, lodSpheres[startLOD-1])) {
 				c.lodQuery(eye, lodSpheres, startLOD - 1, callback);
-			}
-			else {
-				callback(c);
 			}
 		}
 	}
@@ -88,7 +87,7 @@
 		this.h = h;
 
 		var maxDist = Math.sqrt((w * w)+(h * h));
-		var LODLevels = [0.7, 0.4, 0.2, 0.05, 0.01];
+		var LODLevels = [0.05, 0.2, 0.4, 0.6, 0.8, 1.0];
 
 		this.lodSpheres = [];
 		for (var i = 0 ; i < LODLevels.length ; i ++) {
