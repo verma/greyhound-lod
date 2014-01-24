@@ -15,22 +15,36 @@
         </head>
         <body>
 
+                <script src="http://code.jquery.com/jquery-1.10.1.min.js"></script>
+                <script src="bluebird.js"></script>
                 <script src="three.js"></script>
+                <script src="lodash.js"></script>
                 <script src="FirstPersonControls.js"></script>
-                <script src="perlin.js"></script>
+                <script src="QuadTree.js"></script>
 				<script type="x-shader/x-vertex" id="vertexshader">
+						varying vec4 col;
+
 
                         void main() {
-                                vec4 mvPosition = modelViewMatrix * vec4( position, 1.0 );
+								vec3 fpos = vec3(position.x, position.y < 100.0 ? 100.0 : position.y, position.z);
+
+                                vec4 mvPosition = modelViewMatrix * vec4( fpos, 1.0 );
                                 gl_Position = projectionMatrix * mvPosition;
+								if (position.y < 100.0)
+									col = vec4(0.0, 0.0, 0.5, 1.0);
+								else if(position.y < 190.0)
+									col = vec4(0.0, 1.0, 0.0, 1.0);
+								else
+									col = vec4(1.0, 1.0, 1.0, 1.0);
                         }
 
                 </script>
 
                 <script type="x-shader/x-fragment" id="fragmentshader">
+						varying vec4 col;
 
                         void main() {
-                                gl_FragColor = vec4(1.0,0.0,0.0,1.0);
+                                gl_FragColor = col;
                         }
 
                 </script>
@@ -40,100 +54,112 @@
                         var container;
                         var camera, scene, renderer;
 						var controls;
-						var last_d = 0;
-						var tiles = [];
+						var qTree;
 
-						var TILES_X = 1;
-						var TILES_Z = 1;
+						// jquery doesn't do binary download, so we do it ourselves
+						var getBinary = function(url) {
+							return new Promise(function(resolve, reject) {
+								var oReq = new XMLHttpRequest();
+								oReq.open("GET", url, true);
+								oReq.responseType = "arraybuffer";
 
-						var TILE_X_SIZE = 100;
-						var TILE_Z_SIZE = 100;
-
-						var TILE_LEVELS = 1;
-
-						// each tile is 100x100 cell, with 10 levels of detail, we're gonna have a 50x50 tile area
-						//
-
-						noise.seed(Math.random());
-
-                        init();
-                        animate();
-
-						function generatePerlinPoints(minx, minz, maxx, maxz, level) {
-							var stepX = (TILE_LEVELS - level + 1);
-							var stepY = (TILE_LEVELS - level + 1);
-
-							var points = [];
-							for (var z = 0 ; z < TILE_Z_SIZE ; z += stepY) {
-								for (var x = 0 ; x < TILE_X_SIZE ; x += stepX) {
-									var _x = minx + (maxx - minx) * (x / TILE_X_SIZE);
-									var _z = minz + (maxz - minz) * (z / TILE_Z_SIZE);
-									var y = noise.perlin2(_x * 0.001, _z * 0.001) * 10;
-
-									console.log(_x, _z, '=', y);
-
-									points.push(x);
-									points.push(y);
-									points.push(z);
-								}
-							}
-
-							return points;
-						}
-
-						function setupTiles(scene) {
-							var shaderMaterial = new THREE.ShaderMaterial( {
-
-                                vertexShader:   document.getElementById( 'vertexshader' ).textContent,
-                                fragmentShader: document.getElementById( 'fragmentshader' ).textContent,
-
-							});
-
-							var material = new THREE.ParticleSystemMaterial( { size: 1, vertexColors: false } );
-
-							for (var j = 0 ; j < TILES_Z ; j++) {
-								for(var i = 0 ; i < TILES_X ; i++) {
-									var x = (i - (TILES_X/2)) * TILE_X_SIZE;
-									var z = (j - (TILES_Z/2)) * TILE_Z_SIZE;
-
-									var levels = [];
-
-									for (var l = 0 ; l < TILE_LEVELS ; l ++) {
-										var points = generatePerlinPoints(x, z, x + TILE_X_SIZE, z + TILE_Z_SIZE, l+1);
-										console.log(points);
-
-										var geometry = new THREE.BufferGeometry();
-										geometry.addAttribute( 'position', Float32Array, points.length / 3, 3 );
-
-										var positions = geometry.attributes.position.array;
-										for (var c = 0, cl = points.length ; c < cl ; c++) {
-											positions[c] = points[c];
-										}
-
-										var sys = new THREE.ParticleSystem(geometry, material);
-
-										levels.push(sys);
-										scene.add(sys);
-
-										// not visible by default
-										//sys.visible = false;
-										sys.position.set(x, 0, z);
+								oReq.onload = function(oEvent) {
+									if (oReq.status == 200) {
+										return resolve(oReq.response);
 									}
 
-									tiles.push({
-										levels: levels,
-										x: x,
-										y: 0,
-										z: z,
-										sizex: TILE_X_SIZE,
-										sizez: TILE_Z_SIZE
-									});
-								}
-							}
+									reject(new Error("Could not get binary data"));
+								};
+
+								oReq.send();
+							});
+						};
+
+						var getJSON = function(url) {
+							return new Promise(function(res, rej) {
+								$.getJSON(url, res);
+							});
+						};
+
+						var mkUrl = function(d) {
+							return "/points/cloud/"
+								+ d.x + "/"
+								+ d.z + "/"
+								+ d.width + "/"
+								+ d.height;
+						};
+
+						$(function() {
+							init().then(function() {
+								animate();
+							}).done();
+						});
+
+						var doDataQuery = function() {
+							console.log('Do data query');
+
+							var nodes = [];
+							qTree.lodQuery({
+								x: camera.position.x,
+								y: camera.position.z }, function(node) {
+								nodes.push(node);
+							});
+
+							console.log(nodes.length);
+
+							var promises =
+								_.map(nodes, function(n) {
+									console.log(n);
+									if (!n.loadGeometry) {
+										n.loadGeometry = function() {
+											if (n.ps !== undefined)
+												return n.ps;
+
+											var url = mkUrl( {
+												x: n.x,
+												z: n.y,
+												width: n.w,
+												height: n.h });
+
+											console.log(url);
+
+											return getBinary(url).then(function(data) {
+												var floatArray = new Float32Array(data);
+												var geom = new THREE.BufferGeometry();
+												geom.addAttribute('position', Float32Array, floatArray.length / 3, 3);
+
+												var pos = geom.attributes.position.array;
+
+												for (var i = 0, il = pos.length ; i < il ; i += 3) {
+													pos[i] = floatArray[i];
+													pos[i+1] = floatArray[i+1];
+													pos[i+2] = floatArray[i+2];
+												}
+
+
+												var material = new THREE.ShaderMaterial({
+													vertexShader: $("#vertexshader").text(),
+													fragmentShader: $("#fragmentshader").text()
+												});
+
+												n.ps = new THREE.ParticleSystem(geom, material);
+												return n.ps;
+											});
+										};
+									}
+									return n.loadGeometry();
+								});
+
+
+							Promise.all(promises).then(function(pss) {
+								_.forEach(pss, function(ps) {
+									scene.add(ps);
+								});
+							}).done();
 						}
 
-                        function init() {
 
+                        function init() {
                                 container = document.createElement( 'div' );
                                 document.body.appendChild( container );
 
@@ -149,14 +175,13 @@
 								var height = window.innerHeight;
 
                                 camera = new THREE.PerspectiveCamera(45, width / height, 1, 10000);
-								camera.position.set(0, 50, 0);
 								controls = new THREE.FirstPersonControls(camera);
-								controls.lookSpeed = 0.0001;
+								controls.lookSpeed = 0.00001;
+								controls.movementSpeed = 0.1;
+								controls.activeLook = true;
 
                                 scene = new THREE.Scene();
 
-								setupTiles(scene);
-								console.log(tiles);
 
                                 renderer = new THREE.WebGLRenderer();
 								renderer.setClearColor("#111");
@@ -165,6 +190,17 @@
                                 container.appendChild( renderer.domElement );
 
                                 window.addEventListener( 'resize', onWindowResize, false );
+
+								return getJSON("/points/bounds").then(function(bounds) {
+									camera.position.set(0, 500, 0);
+
+									var maxDepth = 
+										Math.log((bounds.width * bounds.height) /
+											(bounds.leaf.width * bounds.leaf.height)) / Math.log(4);
+
+									qTree = new QuadTree(bounds.x, bounds.z, bounds.width, bounds.height, maxDepth)
+									return bounds;
+								});
                         }
 
                         function onWindowResize() {
@@ -180,10 +216,19 @@
 
                         }
 
+						var last_d = 0;
+						var lastCameraPos = null;
+
                         function animate() {
 							var thisTime = (new Date()).getTime();
 							var d = (last_d === 0 ? 0 : (thisTime - last_d));
 							last_d = thisTime;
+
+							if (lastCameraPos === null || lastCameraPos.distanceToSquared(camera.position) > 1000.0) {
+								lastCameraPos = camera.position.clone();
+
+								doDataQuery();
+							}
 
 							requestAnimationFrame( animate );
 							render(d);
