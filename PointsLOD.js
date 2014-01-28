@@ -17,7 +17,7 @@
 		var height = $(canvas).height();
 		var MAX_DEPTH = 5;
 
-		var qTree = new QuadTree(0, 0, width, height, MAX_DEPTH);
+		var qTree = new QuadTree(-width/2, -height/2, width, height, MAX_DEPTH);
 
 		var refreshDisplay = function() {
 			requestAnimationFrame(refreshDisplay);
@@ -29,14 +29,20 @@
 
 			// draw all nodes
 			//
-			qTree.lodQuery(eyePos, function(n) {
+			var queryPos = {
+				x: eyePos.x - width / 2,
+				y: eyePos.y - height / 2
+			};
+
+			qTree.lodQuery(queryPos, function(n) {
 				var r = 100 + Math.floor(((MAX_DEPTH - n.depth) / MAX_DEPTH) * 155);
 
-				console.log(n.depth);
 				context.fillStyle = "hsl(" + Math.floor(360 * n.depth/MAX_DEPTH) + ", 50%, 50%)";
-				context.fillRect(n.x, n.y, n.w, n.h);
+				context.fillRect(
+					n.x + width/2,
+					n.y + height/2,
+					n.w, n.h);
 			});
-
 
 			// draw where our eye goes
 			context.beginPath();

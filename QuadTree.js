@@ -80,14 +80,34 @@
 		}
 	}
 
+	Node.prototype.collectNodes = function() {
+		var thisArr = [this];
+
+		if (this.children.length > 0)
+			return thisArr.concat(
+				this.children[0].collectNodes(),
+				this.children[1].collectNodes(),
+				this.children[2].collectNodes(),
+				this.children[3].collectNodes());
+
+		return thisArr;
+	}
+
 	var QuadTree = function(x, y, w, h, maxDepth) {
 		this.x = x;
 		this.y = y;
 		this.w = w;
 		this.h = h;
+		this.maxDepth = maxDepth;
 
 		var maxDist = Math.sqrt((w * w)+(h * h));
-		var LODLevels = [0.05, 0.2, 0.4, 0.6, 0.8, 1.0];
+		var LODLevels = [];
+
+		for (var i = maxDepth ; i >= 0 ; i--) {
+			LODLevels.push(0.08 + 0.92 * (1.0 - i / maxDepth ))
+		}
+
+		console.log(LODLevels);
 
 		this.lodSpheres = [];
 		for (var i = 0 ; i < LODLevels.length ; i ++) {
@@ -96,6 +116,8 @@
 
 		this.root = new Node(x, y, w, h, 0);
 		this.root.subdivide(maxDepth);
+
+		this.entireTree = this.root.collectNodes();
 	}
 
 	QuadTree.prototype.lodQuery = function(eyePos, callback) {
@@ -104,6 +126,10 @@
 
 	QuadTree.prototype.LODSpheres = function() {
 		return this.lodSpheres;
+	}
+
+	QuadTree.prototype.allNodes = function() {
+		return this.entireTree;
 	}
 
 	global.QuadTree = QuadTree;

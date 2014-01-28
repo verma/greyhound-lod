@@ -12,6 +12,7 @@
 #include <fstream>
 
 #include <sstream>
+#include <random>
 
 #include <boost/filesystem.hpp>
 
@@ -234,19 +235,24 @@ void downsample(const std::string& file, float *pdata) {
 	f.read(reinterpret_cast<char *>(pin), in_size);
 	f.close();
 
-	size_t downsample_size = in_size / (4 * 12);
+	size_t source_size = in_size / 12;
+	size_t downsample_size = source_size / 4;
 
-	float *read_ptr = pin;
 	float *write_ptr = pdata;
+
+	std::default_random_engine generator;
+	std::uniform_int_distribution<size_t> distribution(0, source_size - 1);
 
 	// go through the entire read buffer and pick every 4th point
 	for (size_t i = 0 ; i < downsample_size ; i ++) {
+		size_t src_i = distribution(generator);
+		float *read_ptr = (pin + 3*src_i);
+		
 		write_ptr[0] = read_ptr[0];
 		write_ptr[1] = read_ptr[1];
 		write_ptr[2] = read_ptr[2];
 
 		write_ptr += 3; // move to the beginning of next point
-		read_ptr += 12; // move 4 points from here
 	}
 
 	delete [] pin;

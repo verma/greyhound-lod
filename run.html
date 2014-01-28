@@ -1,16 +1,26 @@
 <!DOCTYPE html>
 <html lang="en">
         <head>
-                <title>three.js canvas - camera - orthographic</title>
+                <title>Large scale LiDAR data visualization</title>
                 <meta charset="utf-8">
                 <meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
                 <style>
                         body {
-                                font-family: Monospace;
+                                font-family: sans-serif;
                                 background-color: #f0f0f0;
                                 margin: 0px;
                                 overflow: hidden;
                         }
+
+						#info {
+							font-size: 20px;
+							text-align: right;
+							font-weight: bold;
+							color: #ddd;
+							position: absolute;
+							top: 20px;
+							right: 20px;
+						}
                 </style>
         </head>
         <body>
@@ -55,6 +65,8 @@
                         var camera, scene, renderer;
 						var controls;
 						var qTree;
+						var totalDataDownloaded = 0;
+						var shaderMaterial;
 
 						// jquery doesn't do binary download, so we do it ourselves
 						var getBinary = function(url) {
@@ -65,6 +77,10 @@
 
 								oReq.onload = function(oEvent) {
 									if (oReq.status == 200) {
+										totalDataDownloaded += oReq.response.length;
+
+										console.log(oReq.getAllResponseHeaders());
+
 										return resolve(oReq.response);
 									}
 
@@ -95,21 +111,70 @@
 							}).done();
 						});
 
+						function formatSize(len) {
+							if (len < 1000) return len.toString() + " B";
+							if (len < 1000000) return (len / 1000).toFixed(0) + " KB";
+							if (len < 1000000000) return (len / 1000000).toFixed(2) + " MB";
+							if (len < 1000000000000) return (len / 1000000000).toFixed(2) + " GB";
+
+							return (len / 1000000000000).toFixed(2) + " TB";
+						}
+
+						function downloadedTotal(len) {
+							$("#info").html(formatSize(len));
+						}
+
+						function bufferToGeometry(data) {
+							var floatArray = new Float32Array(data);
+							var geom = new THREE.BufferGeometry();
+							geom.addAttribute('position', Float32Array, floatArray.length / 3, 3);
+
+							var pos = geom.attributes.position.array;
+							for (var i = 0, il = pos.length ; i < il ; i += 3) {
+								pos[i] = floatArray[i];
+								pos[i+1] = floatArray[i+1];
+								pos[i+2] = floatArray[i+2];
+							}
+
+							return geom;
+						}
+
+						var nodesInScene = [];
+
 						var doDataQuery = function() {
 							console.log('Do data query');
 
 							var nodes = [];
-							qTree.lodQuery({
+							var eyePos = {
 								x: camera.position.x,
-								y: camera.position.z }, function(node) {
+								y: camera.position.z
+							};
+							console.log(eyePos);
+
+							qTree.lodQuery(eyePos, function(node) {
 								nodes.push(node);
 							});
 
-							console.log(nodes.length);
+							console.log('Total nodes this query:', nodes.length);
+							var nodes = _.uniq(nodes);
+							console.log('Unique nodes:', nodes.length);
+
+							var newNodes = _.difference(nodes, nodesInScene);
+							var nodesToRemove = _.difference(nodesInScene, nodes);
+
+							console.log('New nodes this query:', newNodes.length);
+							console.log('Nodes going away this query:', nodesToRemove.length);
+
+							nodesInScene = _.union(_.difference(nodesInScene, nodesToRemove), newNodes);
+							console.log('Nodes in scene:', nodesInScene.length);
+
+							_.forEach(nodesToRemove, function(n) {
+								if (n.ps)
+									scene.remove(n.ps);
+							});
 
 							var promises =
-								_.map(nodes, function(n) {
-									console.log(n);
+								_.map(newNodes, function(n) {
 									if (!n.loadGeometry) {
 										n.loadGeometry = function() {
 											if (n.ps !== undefined)
@@ -121,28 +186,22 @@
 												width: n.w,
 												height: n.h });
 
-											console.log(url);
-
 											return getBinary(url).then(function(data) {
-												var floatArray = new Float32Array(data);
-												var geom = new THREE.BufferGeometry();
-												geom.addAttribute('position', Float32Array, floatArray.length / 3, 3);
-
-												var pos = geom.attributes.position.array;
-
-												for (var i = 0, il = pos.length ; i < il ; i += 3) {
-													pos[i] = floatArray[i];
-													pos[i+1] = floatArray[i+1];
-													pos[i+2] = floatArray[i+2];
-												}
+												var geom = bufferToGeometry(data);
+												n.ps = new THREE.ParticleSystem(geom, shaderMaterial);
 
 
-												var material = new THREE.ShaderMaterial({
-													vertexShader: $("#vertexshader").text(),
-													fragmentShader: $("#fragmentshader").text()
-												});
+												/*
+												var geom = new THREE.CubeGeometry(n.w, 10, n.h);
+												var r = 1 - n.depth / qTree.maxDepth;
+												var col = new THREE.Color(); col.setRGB(r, r, r);
+												var mat = new THREE.MeshBasicMaterial({ color: col.getHex() });
 
-												n.ps = new THREE.ParticleSystem(geom, material);
+												var mesh = new THREE.Mesh(geom, mat);
+												mesh.position.set(n.x - n.w/2, 10 - n.depth, n.y - n.h / 2);
+												n.ps = mesh;
+												*/
+
 												return n.ps;
 											});
 										};
@@ -155,7 +214,7 @@
 								_.forEach(pss, function(ps) {
 									scene.add(ps);
 								});
-							}).done();
+							});
 						}
 
 
@@ -164,11 +223,7 @@
                                 document.body.appendChild( container );
 
                                 var info = document.createElement( 'div' );
-                                info.style.position = 'absolute';
-                                info.style.top = '10px';
-                                info.style.width = '100%';
-                                info.style.textAlign = 'center';
-                                info.innerHTML = '<a href="http://threejs.org" target="_blank">three.js</a> - orthographic view';
+								info.id = "info";
                                 container.appendChild( info );
 
 								var width = window.innerWidth;
@@ -182,6 +237,11 @@
 
                                 scene = new THREE.Scene();
 
+								shaderMaterial = new THREE.ShaderMaterial({
+									vertexShader: $("#vertexshader").text(),
+									fragmentShader: $("#fragmentshader").text()
+								});
+
 
                                 renderer = new THREE.WebGLRenderer();
 								renderer.setClearColor("#111");
@@ -192,15 +252,22 @@
                                 window.addEventListener( 'resize', onWindowResize, false );
 
 								return getJSON("/points/bounds").then(function(bounds) {
-									camera.position.set(0, 500, 0);
+									camera.position.set(0, 150, 0);
 
 									var maxDepth = 
 										Math.log((bounds.width * bounds.height) /
 											(bounds.leaf.width * bounds.leaf.height)) / Math.log(4);
 
 									qTree = new QuadTree(bounds.x, bounds.z, bounds.width, bounds.height, maxDepth)
+
+									setInterval(function() {
+										$.getJSON('/points/totalTransferred', function(data) {
+											downloadedTotal(data.totalTransferred);
+										});
+									}, 2000);
 									return bounds;
 								});
+
                         }
 
                         function onWindowResize() {

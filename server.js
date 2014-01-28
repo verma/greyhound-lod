@@ -30,7 +30,9 @@ var fourOhFour = function(res) {
 	return res.end();
 }
 
-var handlePointRequest = function(url, res) {
+var totalBytesTransferred = 0;
+
+var handlePointRequest = function(url, req, res) {
 	var rx = /\/points\/(.*)/g;
 	var arr = rx.exec(url);
 
@@ -48,6 +50,11 @@ var handlePointRequest = function(url, res) {
 			x: -dataInfo.terrainSize/2, z: -dataInfo.terrainSize/2,
 			width: dataInfo.terrainSize, height: dataInfo.terrainSize,
 			leaf: { width: dataInfo.leafSize, height: dataInfo.leafSize }});
+	}
+	if (parts[0] === 'totalTransferred') {
+		return json({
+			totalTransferred: totalBytesTransferred
+		});
 	}
 	else if (parts[0] === 'cloud') {
 		var x = parts[1];
@@ -68,12 +75,15 @@ var handlePointRequest = function(url, res) {
 			return fs.stat(p, function(err, stats) {
 				if(err) return fourOhFour(res);
 
-				console.log(">>>", p);
+				var needGzip = true; // all files are gzipped
+				console.log(">>>", p, (needGzip ? "(gzip)" : ""));
 
 				res.writeHead(200, {
 					'Content-Type': 'application/octet-stream',
-					'Content-Length': stats.size
+					'Content-Encoding': 'gzip'
 				});
+
+				totalBytesTransferred += stats.size;
 				fs.createReadStream(p).pipe(res);
 			});
 		}
@@ -104,7 +114,7 @@ var go = function() {
 
 	var server = http.createServer(function(req, res) {
 		if (req.url.indexOf('/points') != -1) {
-			return handlePointRequest(req.url, res);
+			return handlePointRequest(req.url, req, res);
 		}
 
 		return fileMap(req.url, res);
