@@ -32,6 +32,8 @@
                 <script src="FirstPersonControls.js"></script>
                 <script src="QuadTree.js"></script>
 				<script type="x-shader/x-vertex" id="vertexshader">
+						attribute vec3 color;
+
 						varying vec4 col;
 
 
@@ -46,6 +48,8 @@
 									col = vec4(0.0, 1.0, 0.0, 1.0);
 								else
 									col = vec4(1.0, 1.0, 1.0, 1.0);
+
+								col = vec4(color, 1.0);
                         }
 
                 </script>
@@ -125,15 +129,24 @@
 						}
 
 						function bufferToGeometry(data) {
+							console.log(data.byteLength, data.byteLength / 24);
+
 							var floatArray = new Float32Array(data);
 							var geom = new THREE.BufferGeometry();
-							geom.addAttribute('position', Float32Array, floatArray.length / 3, 3);
+							geom.addAttribute('position', Float32Array, floatArray.length / 6, 3);
+							geom.addAttribute('color', Float32Array, floatArray.length / 6, 3);
 
 							var pos = geom.attributes.position.array;
+							var col = geom.attributes.color.array;
 							for (var i = 0, il = pos.length ; i < il ; i += 3) {
+
 								pos[i] = floatArray[i];
-								pos[i+1] = floatArray[i+1];
-								pos[i+2] = floatArray[i+2];
+								pos[i+2] = floatArray[i+1];
+								pos[i+1] = floatArray[i+2];
+
+								col[i] = floatArray[i+3];
+								col[i+1] = floatArray[i+4];
+								col[i+2] = floatArray[i+5];
 							}
 
 							return geom;

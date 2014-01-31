@@ -1,4 +1,11 @@
+.vagrant/
 data/
+data-bak/
+*.las
+fetch-terrain
+node_modules/
+*.vdi
+mipmap-terrain
 .DS_Store
 gen-large-terrain
 *.dSYM

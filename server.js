@@ -75,13 +75,20 @@ var handlePointRequest = function(url, req, res) {
 			return fs.stat(p, function(err, stats) {
 				if(err) return fourOhFour(res);
 
-				var needGzip = true; // all files are gzipped
+				var needGzip = process.env.NOGZIP ? false : true;
 				console.log(">>>", p, (needGzip ? "(gzip)" : ""));
 
-				res.writeHead(200, {
-					'Content-Type': 'application/octet-stream',
-					'Content-Encoding': 'gzip'
-				});
+				if (needGzip) {
+					res.writeHead(200, {
+						'Content-Type': 'application/octet-stream',
+						'Content-Encoding': 'gzip'
+					});
+				}
+				else {
+					res.writeHead(200, {
+						'Content-Type': 'application/octet-stream'
+					});
+				}
 
 				totalBytesTransferred += stats.size;
 				fs.createReadStream(p).pipe(res);

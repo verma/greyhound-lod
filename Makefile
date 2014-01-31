@@ -1,13 +1,23 @@
-CC=gcc
-CFLAGS=-g -O3 -std=c++11
-LDFLAGS=-lnoise -lstdc++ -lboost_filesystem -lboost_system
+CC=g++
+CFLAGS=-g -O3 -std=c++0x $(shell pkg-config --cflags libpq)
+LDFLAGS=-lstdc++ -lboost_filesystem -lboost_system $(shell pkg-config --libs libpq)
 
 TARGET=gen-large-terrain
+TARGET2=fetch-terrain
+TARGET3=mipmap-terrain
 
-all: $(TARGET)
+all: $(TARGET2) $(TARGET3)
 
 $(TARGET): gen-large-terrain.cpp
-	$(CC) -o $@ $(CFLAGS) $(LDFLAGS) $<
+	$(CC) -o $@ $(CFLAGS) $(LDFLAGS) $< -lnoise
+
+$(TARGET2): fetch-terrain.cpp
+	$(CC) -o $@ $(CFLAGS) $(LDFLAGS) $< -lpdalcpp
+
+$(TARGET3): mipmap-terrain.cpp
+	$(CC) -o $@ $(CFLAGS) $< $(LDFLAGS)
 
 clean:
 	rm -rf $(TARGET)
+	rm -rf $(TARGET2)
+	rm -rf $(TARGET3)

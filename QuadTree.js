@@ -104,7 +104,7 @@
 		var LODLevels = [];
 
 		for (var i = maxDepth ; i >= 0 ; i--) {
-			LODLevels.push(0.08 + 0.92 * (1.0 - i / maxDepth ))
+			LODLevels.push(0.08 + 0.92 * (1.0 - i / (maxDepth+1) ))
 		}
 
 		console.log(LODLevels);

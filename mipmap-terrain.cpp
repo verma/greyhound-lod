@@ -31,6 +31,8 @@ std::string file_name(ssize_t x, ssize_t z, ssize_t width, ssize_t height) {
 
 void computeMipLevel(size_t field_size, size_t leaf_cell_size, size_t cell_size);
 
+bool isAllDataAvailable(size_t terrainPower, size_t leafPower);
+
 int main (int argc, char** argv)
 {
 	using namespace noise;
@@ -47,83 +49,18 @@ int main (int argc, char** argv)
 	if (argc > 2)
 		cell_size_power = atoi(argv[2]);
 
-
-	if (terrain_size_power > 20) {
-		std::cerr << "The terrain size is a power of 2 and should be less than 20." << std::endl;
+	std::cout << "Terrain size: " << (1 << terrain_size_power) << ", leaf node: " << (1 << cell_size_power) << std::endl;
+	std::cout << "... checking if all leaf nodes are present..." << std::endl;
+	if (!isAllDataAvailable(terrain_size_power, cell_size_power)) {
+		std::cout << "... NO." << std::endl;
 		return 1;
 	}
 
-	if (cell_size_power > terrain_size_power) {
-		std::cerr << "The terrain size is a power of 2 and should be less than the terrain size power." << std::endl;
-		return 1;
-	}
+	std::cout << "... YES." << std::endl;
 
+	size_t size = 1 << terrain_size_power;
+	size_t cell_size = 1 << cell_size_power;
 
-	module::Perlin myModule;
-	ssize_t size = 1 << terrain_size_power;
-	ssize_t cell_size = 1 << cell_size_power;
-
-	ssize_t in_bytes = size * size * 12;
-	float in_gb = in_bytes / (float) (1 << 30);
-
-	cout << "Generating terrain data..." << std::endl;
-	cout << "... " << size << "x" << size << " terrain. Full detail size: "
-		<< size * size * 12 << " bytes (" << in_gb << " GB)." << std::endl;
-	cout << "... Cell size is: " << cell_size << std::endl;
-
-	size_t points_written = 0;
-
-	float *pbuf = new float[cell_size * cell_size * 12];
-
-	// for level 0 point generation, go trouhg the entire terrain
-	//
-	for (ssize_t z = -size/2 ; z < size/2 ; z += cell_size) {
-		for (ssize_t x = -size/2 ; x < size/2 ; x += cell_size) {
-			std::string file = file_name(x, z, cell_size, cell_size);
-
-			std::string dst = "./data/" + file;
-			if (bf::exists(dst))
-				continue;	// don't compute the file unless asked to do so
-
-			// compute date for the given cell
-			//
-			float *pwrite = pbuf;
-
-			for (ssize_t j = 0 ; j < cell_size ; j ++) {
-				for (ssize_t i = 0 ; i < cell_size ; i ++) {
-					double y = myModule.GetValue((x+i)*MULTIPLIER, (z+j)*MULTIPLIER, 0.5);
-
-					pwrite[0] = static_cast<float>(x+i);
-					pwrite[1] = static_cast<float>(0.5 * (y + 1.0) * HEIGHT_MUL);
-					pwrite[2] = static_cast<float>(z+j);
-
-					pwrite += 3;
-				}
-			}
-
-			// write it out
-			//
-			ofstream outfile(dst, ios::binary);
-			if (!outfile.good()) {
-				cerr << "Could not open file for writing..." << std::endl;
-				return 1;
-			}
-
-
-			outfile.write(
-					reinterpret_cast<char*>(pbuf), cell_size * cell_size * 12);
-		}
-
-		points_written += size * cell_size;
-		if (points_written % (size * cell_size * 10) == 0 && points_written != 0) {
-			std::cout << "... " << points_written << " of " << size*size
-				<< " (" << 100 * points_written / (size*size) << "%)  points written."
-				<< std::endl;
-		}
-	}
-	delete [] pbuf;
-
-	std::cout << "... Full detail grids done." << std::endl;
 	std::cout << std::endl;
 
 	// determine the number of mip levels
@@ -154,7 +91,7 @@ int main (int argc, char** argv)
 	return 0;
 }
 
-void downsample(const std::string& file, float *pdata);
+char *downsample(const std::string& file, size_t& size);
 
 void computeMipLevel(size_t field_size, size_t leaf_cell_size, size_t cell_size) {
 	size_t source_cell_size = cell_size / 2;
@@ -190,17 +127,36 @@ void computeMipLevel(size_t field_size, size_t leaf_cell_size, size_t cell_size)
 			// top to bottom, it is not necessary to do so.
 			//
 
-			downsample("./data/" + tl, buf);
-			out.write(reinterpret_cast<char *>(buf), downsample_size);
+			size_t sampleSize = 0;
+			char *buf;
 
-			downsample("./data/" + tr, buf);
-			out.write(reinterpret_cast<char *>(buf), downsample_size);
+			// hurts to play with so much memory, it does really
+			// I will fix it if it hurts even a little bit more.
+			// 
+			buf = downsample("./data/" + tl, sampleSize);
+			if (sampleSize > 0) {
+				out.write(buf, sampleSize);
+				delete[] buf;
+			}
 
-			downsample("./data/" + bl, buf);
-			out.write(reinterpret_cast<char *>(buf), downsample_size);
+			buf = downsample("./data/" + tr, sampleSize);
+			if (sampleSize > 0) {
+				out.write(buf, sampleSize);
+				delete[] buf;
+			}
 
-			downsample("./data/" + br, buf);
-			out.write(reinterpret_cast<char *>(buf), downsample_size);
+			if (sampleSize > 0) {
+				buf = downsample("./data/" + bl, sampleSize);
+				out.write(buf, sampleSize);
+				delete[] buf;
+			}
+
+
+			if (sampleSize > 0) {
+				buf = downsample("./data/" + br, sampleSize);
+				out.write(buf, sampleSize);
+				delete[] buf;
+			}
 
 			out.close();
 		}
@@ -212,21 +168,22 @@ void computeMipLevel(size_t field_size, size_t leaf_cell_size, size_t cell_size)
 // we're blind functions, cuz you got eyes
 // + no filtering boys and girls, just raw pick and spit
 //
-void downsample(const std::string& file, float *pdata) {
+char *downsample(const std::string& file, size_t& size) {
 	namespace bf = boost::filesystem;
 
 	size_t in_size = bf::file_size(file);
 
 	if (in_size % sizeof(float) != 0) {
 		std::cerr << "Your file doesn't have float units?" << std::endl;
-		return;
+		return NULL;
 	}
 		
 	std::ifstream f(file, std::ios::binary);
 	if (!f.good()) {
 		std::cerr << "Cannot downsample: " << file << ", couldn't open." << std::endl;
-		return;
+		return NULL;
 	}
+
 
 	// read entire contents and close
 	//
@@ -235,25 +192,54 @@ void downsample(const std::string& file, float *pdata) {
 	f.read(reinterpret_cast<char *>(pin), in_size);
 	f.close();
 
-	size_t source_size = in_size / 12;
+	size_t source_size = in_size / 24;
 	size_t downsample_size = source_size / 4;
 
-	float *write_ptr = pdata;
+	size = 6 * downsample_size * sizeof(float);
 
+	std::cout << "source point count: " << source_size << ", downsample size: " << downsample_size
+		<< ", file size: " << size << ", div? " << size % 4 << std::endl;
+
+	char *pdata = new char[size];
+	float *write_ptr = reinterpret_cast<float*>(pdata);
+
+	// don't you mess with ma distribution function
 	std::default_random_engine generator;
 	std::uniform_int_distribution<size_t> distribution(0, source_size - 1);
 
 	// go through the entire read buffer and pick every 4th point
 	for (size_t i = 0 ; i < downsample_size ; i ++) {
 		size_t src_i = distribution(generator);
-		float *read_ptr = (pin + 3*src_i);
+		float *read_ptr = (pin + 6*src_i);
 		
 		write_ptr[0] = read_ptr[0];
 		write_ptr[1] = read_ptr[1];
 		write_ptr[2] = read_ptr[2];
+		write_ptr[3] = read_ptr[3];
+		write_ptr[4] = read_ptr[4];
+		write_ptr[5] = read_ptr[5];
 
-		write_ptr += 3; // move to the beginning of next point
+		write_ptr += 6; // move to the beginning of next point
 	}
 
 	delete [] pin;
+	return pdata;
+}
+
+bool isAllDataAvailable(size_t terrainPower, size_t leafPower) {
+	ssize_t fs = static_cast<ssize_t>(1 << terrainPower);
+	ssize_t cell_size = 1 << leafPower;
+
+	for (ssize_t z = -fs / 2 ; z < fs / 2; z += cell_size) {
+		for (ssize_t x = -fs / 2 ; x < fs / 2 ; x += cell_size) {
+			// get the name of the file we'd write down sampled data to
+			//
+			std::string target_file = "./data/" + file_name(x, z, cell_size, cell_size);
+
+			if (!boost::filesystem::exists(target_file))
+				return false;
+		}
+	}
+
+	return true;
 }
