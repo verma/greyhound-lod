@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
         <head>
-                <title>Large scale LiDAR data visualization</title>
+                <title>Single Tite Visualization</title>
                 <meta charset="utf-8">
                 <meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
                 <style>
@@ -36,19 +36,10 @@
 
 						varying vec4 col;
 
-
                         void main() {
 								vec3 fpos = vec3(position.x, position.y < 100.0 ? 100.0 : position.y, position.z);
-
                                 vec4 mvPosition = modelViewMatrix * vec4( fpos, 1.0 );
                                 gl_Position = projectionMatrix * mvPosition;
-								if (position.y < 100.0)
-									col = vec4(0.0, 0.0, 0.5, 1.0);
-								else if(position.y < 190.0)
-									col = vec4(0.0, 1.0, 0.0, 1.0);
-								else
-									col = vec4(1.0, 1.0, 1.0, 1.0);
-
 								col = vec4(color, 1.0);
                         }
 
@@ -67,8 +58,8 @@
 
                         var container;
                         var camera, scene, renderer;
+						var cameraO;
 						var controls;
-						var qTree;
 						var totalDataDownloaded = 0;
 						var shaderMaterial;
 
@@ -128,8 +119,9 @@
 							$("#info").html(formatSize(len));
 						}
 
-						function bufferToGeometry(data) {
+						function bufferToGeometry(data, n) {
 							console.log(data.byteLength, data.byteLength / 24);
+
 							var floatArray = new Float32Array(data);
 							var geom = new THREE.BufferGeometry();
 							geom.addAttribute('position', Float32Array, floatArray.length / 6, 3);
@@ -140,7 +132,12 @@
 							for (var i = 0, il = pos.length ; i < il ; i += 3) {
 								pos[i] = floatArray[i];
 								pos[i+2] = floatArray[i+1];
-								pos[i+1] = floatArray[i+2]; // don't touch the height
+
+								if (pos[i] < n.x || pos[i] > n.x + n.w ||
+										pos[i+2] < n.y || pos[i+2] > n.y + n.h) {
+									console.log("OOB", pos[i], pos[i+2]);
+								}
+								pos[i+1] = floatArray[i+2];
 
 								col[i] = floatArray[i+3];
 								col[i+1] = floatArray[i+4];
@@ -150,50 +147,17 @@
 							return geom;
 						}
 
-						var nodesInScene = [];
-
 						var doDataQuery = function() {
 							console.log('Do data query');
 
-							var nodes = [];
-							var eyePos = {
-								x: camera.position.x,
-								y: camera.position.z
-							};
-							console.log(eyePos);
+							var node = {
+								x: 0, y: 0,
+								w: 512, h: 512 };
 
-							qTree.lodQuery(eyePos, function(node) {
-								nodes.push(node);
-							});
+							console.log("Fetching node", node);
 
-							console.log("Total nodes in tree: ", qTree.allNodes().length);
-							console.log("Total nodes this query(before filter):", nodes.length);
-
-							console.log('Total nodes this query:', nodes.length);
-							var nodes = _.uniq(nodes);
-							console.log('Unique nodes:', nodes.length);
-
-							nodes = _.filter(nodes, function(n) {
-								return n.depth === 0;
-							});
-
-
-							var newNodes = _.difference(nodes, nodesInScene);
-							var nodesToRemove = _.difference(nodesInScene, nodes);
-
-							console.log('New nodes this query:', newNodes.length);
-							console.log('Nodes going away this query:', nodesToRemove.length);
-
-							nodesInScene = _.union(_.difference(nodesInScene, nodesToRemove), newNodes);
-							console.log('Nodes in scene:', nodesInScene.length);
-
-							_.forEach(nodesToRemove, function(n) {
-								if (n.ps)
-									scene.remove(n.ps);
-							});
-
-							var promises =
-								_.map(newNodes, function(n) {
+							var promise =
+								(function(n) {
 									if (!n.loadGeometry) {
 										n.loadGeometry = function() {
 											if (n.ps !== undefined)
@@ -206,7 +170,7 @@
 												height: n.h });
 
 											return getBinary(url).then(function(data) {
-												var geom = bufferToGeometry(data);
+												var geom = bufferToGeometry(data, n);
 												n.ps = new THREE.ParticleSystem(geom, shaderMaterial);
 
 
@@ -226,18 +190,44 @@
 										};
 									}
 									return n.loadGeometry();
-								});
+								})(node);
 
 
-							Promise.all(promises).then(function(pss) {
-								_.forEach(pss, function(ps) {
-									scene.add(ps);
-								});
+							promise.then(function(ps) {
+								// set orthotgraphic projection
+								var marginF = 0.0;
+								var wf = node.w * marginF;
+								var hf = node.h * marginF;
+
+								console.log(wf, hf);
+
+								cameraO.left	= node.x - wf;
+								cameraO.right	= node.x + node.w + wf ;
+								cameraO.bottom		= node.y - hf;
+								cameraO.top  = node.y + node.h + hf;
+
+								console.log("camera planes",
+									cameraO.left,
+									cameraO.right,
+									cameraO.top,
+									cameraO.bottom);
+
+								cameraO.updateProjectionMatrix();
+
+								var x = node.x + node.w / 2,
+									z = node.y + node.h / 2;
+
+								console.log(x, z);
+
+								cameraO.position.set(x, 400, z);
+								cameraO.lookAt(new THREE.Vector3(x, 0, z));
+
+								scene.add(ps);
+
+								console.log("Node added to scene");
 							});
 						}
 
-
-						var lodcircles = [];
                         function init() {
                                 container = document.createElement( 'div' );
                                 document.body.appendChild( container );
@@ -248,12 +238,6 @@
 
 								var width = window.innerWidth;
 								var height = window.innerHeight;
-
-                                camera = new THREE.PerspectiveCamera(45, width / height, 1, 10000);
-								controls = new THREE.FirstPersonControls(camera);
-								controls.lookSpeed = 0.00001;
-								controls.movementSpeed = 0.1;
-								controls.activeLook = true;
 
                                 scene = new THREE.Scene();
 
@@ -272,31 +256,13 @@
                                 window.addEventListener( 'resize', onWindowResize, false );
 
 								return getJSON("/points/bounds").then(function(bounds) {
-									camera.position.set(0, 150, 0);
 									console.log("Region bounds:", bounds);
-
 									var maxDepth = 
 										Math.log((bounds.width * bounds.height) /
 											(bounds.leaf.width * bounds.leaf.height)) / Math.log(4);
 
-									qTree = new QuadTree(bounds.x, bounds.z, bounds.width, bounds.height, maxDepth)
-
-									var ls = qTree.LODSpheres();
-									console.log(ls);
-
-									for (var i = 0 ; i < ls.length ; i ++) {
-										var r = ls[i];
-										var c = new THREE.Color();
-										c.setRGB(i / (1.0*ls.length), 0, 0);
-										var g = new THREE.CylinderGeometry(r, r, 1.0, 40, 1, false);
-										var m = new THREE.MeshBasicMaterial( { color: c, overdraw: true } );
-										
-										var mesh = new THREE.Mesh(g, m);
-										mesh.position.y = (ls.length - i) * 5;
-
-										lodcircles.push(mesh);
-										scene.add(mesh);
-									}
+									cameraO = new THREE.OrthographicCamera(bounds.x, bounds.x + bounds.width,
+										bounds.z, bounds.z + bounds.height, 1, 10000);
 
 									setInterval(function() {
 										$.getJSON('/points/totalTransferred', function(data) {
@@ -304,49 +270,27 @@
 										});
 									}, 2000);
 									return bounds;
+								}).then(function() {
+									doDataQuery();
 								});
+
 
                         }
 
                         function onWindowResize() {
-
-                                camera.left = window.innerWidth / - 2;
-                                camera.right = window.innerWidth / 2;
-                                camera.top = window.innerHeight / 2;
-                                camera.bottom = window.innerHeight / - 2;
-
-                                camera.updateProjectionMatrix();
-
-                                renderer.setSize( window.innerWidth, window.innerHeight );
-
+							renderer.setSize( window.innerWidth, window.innerHeight );
                         }
 
 						var last_d = 0;
 						var lastCameraPos = null;
 
                         function animate() {
-							var thisTime = (new Date()).getTime();
-							var d = (last_d === 0 ? 0 : (thisTime - last_d));
-							last_d = thisTime;
-
-							if (lastCameraPos === null || lastCameraPos.distanceToSquared(camera.position) > 1000.0) {
-								lastCameraPos = camera.position.clone();
-
-								doDataQuery();
-							}
-
 							requestAnimationFrame( animate );
-							render(d);
+							render();
                         }
 
-                        function render(delta) {
-							controls.update(delta);
-							for (var i = 0 ; i < lodcircles.length ; i ++) {
-								lodcircles[i].position.x = camera.position.x;
-								lodcircles[i].position.z = camera.position.z;
-							}
-
-							renderer.render( scene, camera );
+                        function render() {
+							renderer.render( scene, cameraO );
                         }
 
                 </script>

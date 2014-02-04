@@ -5,8 +5,9 @@ LDFLAGS=-lstdc++ -lboost_filesystem -lboost_system $(shell pkg-config --libs lib
 TARGET=gen-large-terrain
 TARGET2=fetch-terrain
 TARGET3=mipmap-terrain
+TARGET4=validate-points
 
-all: $(TARGET2) $(TARGET3)
+all: $(TARGET2) $(TARGET3) $(TARGET4)
 
 $(TARGET): gen-large-terrain.cpp
 	$(CC) -o $@ $(CFLAGS) $(LDFLAGS) $< -lnoise
@@ -17,7 +18,11 @@ $(TARGET2): fetch-terrain.cpp
 $(TARGET3): mipmap-terrain.cpp
 	$(CC) -o $@ $(CFLAGS) $< $(LDFLAGS)
 
+$(TARGET4) : validate-points.cpp
+	$(CC) -o $@ $(CFLAGS) $< $(LDFLAGS)
+
 clean:
 	rm -rf $(TARGET)
 	rm -rf $(TARGET2)
 	rm -rf $(TARGET3)
+	rm -rf $(TARGET4)

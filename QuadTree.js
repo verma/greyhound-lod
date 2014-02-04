@@ -30,8 +30,8 @@
 		this.children = [];
 	};
 
-	Node.prototype.subdivide = function(d) {
-		if (d === 0)
+	Node.prototype.subdivide = function() {
+		if (this.depth === 0)
 			return;
 
 		var x = this.x;
@@ -40,15 +40,17 @@
 		var h = this.h;
 	
 
-		this.children.push(new Node(x, y, w/2, h/2, d));
-		this.children.push(new Node(x+w/2, y, w/2, h/2, d));
-		this.children.push(new Node(x, y+h/2, w/2, h/2, d));
-		this.children.push(new Node(x+w/2, y+h/2, w/2, h/2, d));
+		var d = this.depth;
 
-		this.children[0].subdivide(d - 1);
-		this.children[1].subdivide(d - 1);
-		this.children[2].subdivide(d - 1);
-		this.children[3].subdivide(d - 1);
+		this.children.push(new Node(x, y, w/2, h/2, d-1));
+		this.children.push(new Node(x+w/2, y, w/2, h/2, d-1));
+		this.children.push(new Node(x, y+h/2, w/2, h/2, d-1));
+		this.children.push(new Node(x+w/2, y+h/2, w/2, h/2, d-1));
+
+		this.children[0].subdivide();
+		this.children[1].subdivide();
+		this.children[2].subdivide();
+		this.children[3].subdivide();
 	}
 
 	Node.prototype.lodQuery = function(eye, lodSpheres, startLOD, callback) {
@@ -59,8 +61,11 @@
 			return;
 
 		// if we are already at the bottom of the tree, just emit
-		if (startLOD === 0 || this.children.length === 0)
+		if (startLOD === 0 || this.children.length === 0) {
+			console.log('Hit bottom', startLOD, this.children.length)
+			console.log(this.depth);
 			return callback(this);
+		}
 
 		// we got more LOD levels to go, check if a part of this cell
 		// intersects a lower LOD level
@@ -103,8 +108,13 @@
 		var maxDist = Math.sqrt((w * w)+(h * h));
 		var LODLevels = [];
 
+		var distF = function(i) { return Math.pow(i, 1/4.0); };
+
+		var maxVal = distF(maxDepth);
+		console.log('max val', maxVal);
 		for (var i = maxDepth ; i >= 0 ; i--) {
-			LODLevels.push(0.08 + 0.92 * (1.0 - i / (maxDepth+1) ))
+			LODLevels.push(0.09 + 0.91 * (1.0 - (distF(i) / maxVal)));
+
 		}
 
 		console.log(LODLevels);
@@ -114,8 +124,8 @@
 			this.lodSpheres.push(LODLevels[i] * maxDist);
 		}
 
-		this.root = new Node(x, y, w, h, 0);
-		this.root.subdivide(maxDepth);
+		this.root = new Node(x, y, w, h, maxDepth);
+		this.root.subdivide();
 
 		this.entireTree = this.root.collectNodes();
 	}

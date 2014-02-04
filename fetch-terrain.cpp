@@ -12,22 +12,13 @@
 
 #include <iostream>
 
-int findPowerOfTwoLarger(double v) {
-	int power = 1;
-	while (static_cast<double>(1 << power) < v)
-		power ++;
-
-	return power;
-}
-
 std::string file_name(ssize_t x, ssize_t z, ssize_t width, ssize_t height) {
 	std::stringstream sstr;
 	sstr << "data." << x << "." << z << "." << x+width << "." << z+height;
 	return sstr.str();
 }
 
-//std::shared_ptr<pdal::PointerBuffer> 
-void readBuffer (double minx, double miny, double maxx, double maxy, const std::string& filename, double normx, double normy) {
+void readBuffer (double minx, double miny, double maxx, double maxy, const std::string& filename, double normx, double normy, double tscale) {
 	pdal::Options readerOptions;
 	readerOptions.add("connection", "host='localhost' dbname='lidar' user='lidar'");
 	readerOptions.add("table", "lidar");
@@ -64,13 +55,22 @@ void readBuffer (double minx, double miny, double maxx, double maxy, const std::
 	pdal::Dimension const& b = pbuf.getSchema().getDimension("Blue");
 
 
-	std::cout << "Writing to: " << filename << ", total: " << pReader->getNumPoints() << " points." << std::endl;
+	std::cout << "Writing to: " << filename << ", total uncropped: " << pReader->getNumPoints() << " points." << std::endl;
 
 	std::ofstream outfile(filename, std::ios::binary);
+	size_t in = 0, out = 0;
 	for (size_t i = 0, il = pReader->getNumPoints() ; i < il ; i ++) {
-		float x_ = static_cast<float>(x.applyScaling(pbuf.getField<int>(x, i))) - normx,
-			  y_ = static_cast<float>(y.applyScaling(pbuf.getField<int>(y, i))) - normy,
+		float x_ = static_cast<float>(x.applyScaling(pbuf.getField<int>(x, i))),
+			  y_ = static_cast<float>(y.applyScaling(pbuf.getField<int>(y, i))),
 			  z_ = static_cast<float>(z.applyScaling(pbuf.getField<int>(z, i)));
+
+		if (x_ < minx || x_ > maxx || y_ < miny || y_ > maxy) {
+			out ++;
+			continue; // this point is not in our region, quick filter
+		}
+
+		x_ = (x_ - normx) * tscale;
+		y_ = (y_ - normy) * tscale;
 
 		float r_ = (float)pbuf.getField<boost::uint8_t>(r, i) / 255.0f,
 			  g_ = (float)pbuf.getField<boost::uint8_t>(g, i) / 255.0f,
@@ -83,8 +83,11 @@ void readBuffer (double minx, double miny, double maxx, double maxy, const std::
 		outfile.write((char*)&r_, sizeof(float));
 		outfile.write((char*)&g_, sizeof(float));
 		outfile.write((char*)&b_, sizeof(float));
+		in++;
 	}
 	outfile.close();
+
+	std::cout << "Volume point stats: inside: " << in << ", out: " << out << std::endl;
 
 	/*
 	if (stage->getNumPoints() > 0)
@@ -93,64 +96,20 @@ void readBuffer (double minx, double miny, double maxx, double maxy, const std::
 }
 
 int main(int argc, char *argv[]) {
-	/*
-	double minx = -10328630.5337897,
-		   miny = 5261567.25756276,
-		   maxx = -10293814.8637897,
-		   maxy = 9433270.07756276;
-		   */
-
-	double nums[4] = { -10328630.5337897, 9400741.04756276, -10293814.8637897, 9433270.07756276 };
-
-	double minx = nums[0],
-		   miny = nums[1],
-		   maxx = nums[2],
-		   maxy = nums[3];
-
-	double dimx = maxx - minx,
-		   dimy = maxy - miny;
-
 	int x = atoi(argv[1]);
 	int y = atoi(argv[2]);
 	int terrainSize = atoi(argv[3]);
 	int leafNodeSize = atoi(argv[4]);
 
-	int pow2 = 14;
-	int leafNodePow2 = 7;
+	double _xs = atof(argv[5]);
+	double _xe = atof(argv[6]);
 
-	double maxRange = std::max(dimx, dimy);
+	double _ys = atof(argv[7]);
+	double _ye = atof(argv[8]);
 
-	maxRange *= 0.05;
+	double _tscale = atof(argv[9]);
+	double _normx = atof(argv[10]);
+	double _normy = atof(argv[11]);
 
-	double centerX = minx + dimx / 2;
-	double centerY = miny + dimy / 2;
-
-	double normx = centerX - maxRange * 0.5;
-	double normy = centerY - maxRange * 0.5;
-
-	std::cout << "norms: " << normx << ", " << normy << std::endl;
-
-	//readBuffer(-10328630.53, 5261567.25, -10298630.53, 5291567.25);
-
-	// generate base level
-	//
-	//for (int y = -terrainSize / 2 ; y < terrainSize / 2 ; y += leafNodeSize) {
-		//for (int x = -terrainSize / 2 ; x < terrainSize / 2 ; x += leafNodeSize) {
-
-			double _xs = centerX + 0.5 * maxRange * x / double(terrainSize / 2);
-			double _ys = centerY + 0.5 * maxRange * y / double(terrainSize / 2);
-
-			double _xe = centerX + 0.5 * maxRange * (x + leafNodeSize) / double(terrainSize / 2);
-			double _ye = centerY + 0.5 * maxRange * (y + leafNodeSize) / double(terrainSize / 2);
-
-			//if (_xe > minx && _xs < maxx) {
-				std::cout << "leafnode: " << x << ", " <<
-					y << ": q: " << _xs << ", " << _ys << ", " << _xe << ", " << _ye <<
-					", dims: " << _xe - _xs << ", " << _ye - _ys << std::endl;
-
-
-				readBuffer(_xs, _ys, _xe, _ye, "./data/" + file_name(x, y, leafNodeSize, leafNodeSize), normx, normy);
-			//}
-		//}
-	//}
+	readBuffer(_xs, _ys, _xe, _ye, "./data/" + file_name(x, y, leafNodeSize, leafNodeSize), _normx, _normy, _tscale);
 }

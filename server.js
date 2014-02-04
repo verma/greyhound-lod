@@ -16,6 +16,8 @@ function endsWith(str, suffix) {
 
 var staticMap = {
 	"/": [ "run.html", "text/html"],
+	"/top": ["top-proj.html", "text/html"],
+	"/single": ["view-single.html", "text/html"],
 	"/bluebird.js": ["bluebird.js", "application/json; charset=utf-8"],
 	"/QuadTree.js": ["QuadTree.js", "application/json; charset=utf-8"],
 	"/three.js": ["three.js", "application/json; charset=utf-8"],

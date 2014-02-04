@@ -39,16 +39,8 @@
 
                         void main() {
 								vec3 fpos = vec3(position.x, position.y < 100.0 ? 100.0 : position.y, position.z);
-
                                 vec4 mvPosition = modelViewMatrix * vec4( fpos, 1.0 );
                                 gl_Position = projectionMatrix * mvPosition;
-								if (position.y < 100.0)
-									col = vec4(0.0, 0.0, 0.5, 1.0);
-								else if(position.y < 190.0)
-									col = vec4(0.0, 1.0, 0.0, 1.0);
-								else
-									col = vec4(1.0, 1.0, 1.0, 1.0);
-
 								col = vec4(color, 1.0);
                         }
 
@@ -67,6 +59,7 @@
 
                         var container;
                         var camera, scene, renderer;
+						var cameraO;
 						var controls;
 						var qTree;
 						var totalDataDownloaded = 0;
@@ -130,6 +123,7 @@
 
 						function bufferToGeometry(data) {
 							console.log(data.byteLength, data.byteLength / 24);
+
 							var floatArray = new Float32Array(data);
 							var geom = new THREE.BufferGeometry();
 							geom.addAttribute('position', Float32Array, floatArray.length / 6, 3);
@@ -138,9 +132,15 @@
 							var pos = geom.attributes.position.array;
 							var col = geom.attributes.color.array;
 							for (var i = 0, il = pos.length ; i < il ; i += 3) {
-								pos[i] = floatArray[i];
-								pos[i+2] = floatArray[i+1];
-								pos[i+1] = floatArray[i+2]; // don't touch the height
+								pos[i] = floatArray[i] - qTree.w/2;
+								pos[i+2] = floatArray[i+1] - qTree.h/2;
+
+								if (i/3 < 10) {
+									console.log(floatArray[i], floatArray[i+1]);
+									console.log("-->", pos[i], pos[i+2]);
+								}
+
+								pos[i+1] = floatArray[i+2];
 
 								col[i] = floatArray[i+3];
 								col[i+1] = floatArray[i+4];
@@ -162,9 +162,14 @@
 							};
 							console.log(eyePos);
 
-							qTree.lodQuery(eyePos, function(node) {
-								nodes.push(node);
+							//qTree.lodQuery(eyePos, function(node) {
+								//nodes.push(node);
+							//});
+							nodes = _.filter(qTree.allNodes(), function(n) {
+								return n.x === n.y &&
+								n.w === 512 && n.h === 512;
 							});
+							//nodes = qTree.allNodes();
 
 							console.log("Total nodes in tree: ", qTree.allNodes().length);
 							console.log("Total nodes this query(before filter):", nodes.length);
@@ -238,6 +243,8 @@
 
 
 						var lodcircles = [];
+						var cameraPosInd = null;
+
                         function init() {
                                 container = document.createElement( 'div' );
                                 document.body.appendChild( container );
@@ -253,7 +260,7 @@
 								controls = new THREE.FirstPersonControls(camera);
 								controls.lookSpeed = 0.00001;
 								controls.movementSpeed = 0.1;
-								controls.activeLook = true;
+								controls.activeLook = false;
 
                                 scene = new THREE.Scene();
 
@@ -281,6 +288,11 @@
 
 									qTree = new QuadTree(bounds.x, bounds.z, bounds.width, bounds.height, maxDepth)
 
+									cameraO = new THREE.OrthographicCamera(bounds.x, bounds.x + bounds.width,
+										bounds.z, bounds.z + bounds.height, 1, 10000);
+									cameraO.position.set(0, 400, 0);
+									cameraO.lookAt(new THREE.Vector3(0,0,0));
+
 									var ls = qTree.LODSpheres();
 									console.log(ls);
 
@@ -297,6 +309,15 @@
 										lodcircles.push(mesh);
 										scene.add(mesh);
 									}
+
+									var g = new THREE.SphereGeometry(100, 15, 15);
+									var c = new THREE.Color(); c.setRGB(0, 1.0, 0);
+									var m = new THREE.MeshBasicMaterial({ color: c, overdraw: true });
+
+									cameraPosInd = new THREE.Mesh(g, m);
+
+									scene.add(cameraPosInd);
+
 
 									setInterval(function() {
 										$.getJSON('/points/totalTransferred', function(data) {
@@ -333,6 +354,7 @@
 								lastCameraPos = camera.position.clone();
 
 								doDataQuery();
+								//doDataQuery = function() { }; // only one query
 							}
 
 							requestAnimationFrame( animate );
@@ -341,12 +363,14 @@
 
                         function render(delta) {
 							controls.update(delta);
+							cameraPosInd.position.set(camera.position.x, camera.position.y, camera.position.z);
+
 							for (var i = 0 ; i < lodcircles.length ; i ++) {
 								lodcircles[i].position.x = camera.position.x;
 								lodcircles[i].position.z = camera.position.z;
 							}
 
-							renderer.render( scene, camera );
+							renderer.render( scene, cameraO );
                         }
 
                 </script>
