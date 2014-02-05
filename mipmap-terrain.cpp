@@ -230,16 +230,21 @@ bool isAllDataAvailable(size_t terrainPower, size_t leafPower) {
 	ssize_t fs = static_cast<ssize_t>(1 << terrainPower);
 	ssize_t cell_size = 1 << leafPower;
 
+	bool all_good = true;
 	for (ssize_t z = -fs / 2 ; z < fs / 2; z += cell_size) {
 		for (ssize_t x = -fs / 2 ; x < fs / 2 ; x += cell_size) {
 			// get the name of the file we'd write down sampled data to
 			//
 			std::string target_file = "./data/" + file_name(x, z, cell_size, cell_size);
 
-			if (!boost::filesystem::exists(target_file))
-				return false;
+			bool exists = boost::filesystem::exists(target_file);
+			all_good &= exists;
+
+			if (!exists) {
+				std::cout << "... missing: " << target_file << std::endl;
+			}
 		}
 	}
 
-	return true;
+	return all_good;
 }

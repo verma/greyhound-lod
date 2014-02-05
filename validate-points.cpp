@@ -34,36 +34,40 @@ std::vector<int> bounds_from_file(const std::string& filename) {
 bool validateFile(const std::string& filename) {
 	std::vector<int> bounds = bounds_from_file(filename);
 
-	float l = static_cast<float>(bounds[0]),
-		  t = static_cast<float>(bounds[1]),
-		  r = static_cast<float>(bounds[2]),
-		  b = static_cast<float>(bounds[3]);
-
-	std::cout << "File bounds: (" << l << ", " << t << ") -> (" << r << ", " << b << ")" << std::endl;
-
-	std::ifstream f(filename, std::ios::binary);
-	if (!f.good())
-		return false;
-
-	bool allGood = true;
-	float record[6];
-
+	size_t size = boost::filesystem::file_size(filename);
 	size_t in = 0, out = 0;
-	while (!f.eof()) {
-		f.read(reinterpret_cast<char*>(record), sizeof(record));
-		float x = record[0], y = record[1], z = record[2];
+	bool allGood = true;
 
-		bool c = (x >= l && x <= r && y >= t && y <= b);
-		if (c) in ++;
-		else out ++;
+	if (size > 0) { // empty files are valid files
+		float l = static_cast<float>(bounds[0]),
+			  t = static_cast<float>(bounds[1]),
+			  r = static_cast<float>(bounds[2]),
+			  b = static_cast<float>(bounds[3]);
 
-		if (!c) {
-			//std::cout << "FAILED: " << x << ", " << y << std::endl;
+		std::cout << "File bounds: (" << l << ", " << t << ") -> (" << r << ", " << b << ")" << std::endl;
+
+		std::ifstream f(filename, std::ios::binary);
+		if (!f.good())
+			return false;
+
+		float record[6];
+
+		while (!f.eof()) {
+			f.read(reinterpret_cast<char*>(record), sizeof(record));
+			float x = record[0], y = record[1], z = record[2];
+
+			bool c = (x >= l && x <= r && y >= t && y <= b);
+			if (c) in ++;
+			else out ++;
+
+			if (!c) {
+				//std::cout << "FAILED: " << x << ", " << y << std::endl;
+			}
+
+			allGood &= c;
 		}
-
-		allGood &= c;
+		f.close();
 	}
-	f.close();
 
 	std::cout << "Point stats: in: " << in << ", out: " << out << std::endl;
 	return allGood;

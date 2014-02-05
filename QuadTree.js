@@ -108,12 +108,12 @@
 		var maxDist = Math.sqrt((w * w)+(h * h));
 		var LODLevels = [];
 
-		var distF = function(i) { return Math.pow(i, 1/4.0); };
+		var distF = function(i) { return Math.pow(i, 1/5.0); };
 
 		var maxVal = distF(maxDepth);
 		console.log('max val', maxVal);
 		for (var i = maxDepth ; i >= 0 ; i--) {
-			LODLevels.push(0.09 + 0.91 * (1.0 - (distF(i) / maxVal)));
+			LODLevels.push(0.01 + 0.99 * (1.0 - (distF(i) / maxVal)));
 
 		}
 

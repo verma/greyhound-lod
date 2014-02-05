@@ -176,11 +176,9 @@
 							var nodes = _.uniq(nodes);
 							console.log('Unique nodes:', nodes.length);
 
-							/*
 							nodes = _.filter(nodes, function(n) {
-								return n.depth === 0;
+								return n.depth <= 3;
 							});
-							*/
 
 
 							var newNodes = _.difference(nodes, nodesInScene);
@@ -193,8 +191,11 @@
 							console.log('Nodes in scene:', nodesInScene.length);
 
 							_.forEach(nodesToRemove, function(n) {
-								if (n.ps)
+								if (n.ps) {
 									scene.remove(n.ps);
+									n.ps = null;
+									n.ps = undefined;
+								}
 							});
 
 							var promises =
@@ -270,7 +271,7 @@
 								*/
 								shaderMaterial = new THREE.ParticleSystemMaterial({
 									vertexColors: true,
-									size: 4
+									size: 2
 								});
 
 
