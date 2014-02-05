@@ -137,14 +137,17 @@
 
 							var pos = geom.attributes.position.array;
 							var col = geom.attributes.color.array;
-							for (var i = 0, il = pos.length ; i < il ; i += 3) {
-								pos[i] = floatArray[i];
-								pos[i+2] = floatArray[i+1];
-								pos[i+1] = floatArray[i+2]; // don't touch the height
+							var si = 0;
+							for (var i = 0, il = pos.length ; i < il ; i += 3, si+=6) {
+								pos[i] = floatArray[si];
+								pos[i+2] = floatArray[si+1];
+								pos[i+1] = floatArray[si+2]; // don't touch the height
 
-								col[i] = floatArray[i+3];
-								col[i+1] = floatArray[i+4];
-								col[i+2] = floatArray[i+5];
+								col[i] = floatArray[si+3];
+								col[i+1] = floatArray[si+4];
+								col[i+2] = floatArray[si+5];
+
+								si += 6;
 							}
 
 							return geom;
@@ -173,9 +176,11 @@
 							var nodes = _.uniq(nodes);
 							console.log('Unique nodes:', nodes.length);
 
+							/*
 							nodes = _.filter(nodes, function(n) {
 								return n.depth === 0;
 							});
+							*/
 
 
 							var newNodes = _.difference(nodes, nodesInScene);
@@ -249,7 +254,7 @@
 								var width = window.innerWidth;
 								var height = window.innerHeight;
 
-                                camera = new THREE.PerspectiveCamera(45, width / height, 1, 10000);
+                                camera = new THREE.PerspectiveCamera(85, width / height, 1, 10000);
 								controls = new THREE.FirstPersonControls(camera);
 								controls.lookSpeed = 0.00001;
 								controls.movementSpeed = 0.1;
@@ -257,9 +262,15 @@
 
                                 scene = new THREE.Scene();
 
+								/*
 								shaderMaterial = new THREE.ShaderMaterial({
 									vertexShader: $("#vertexshader").text(),
 									fragmentShader: $("#fragmentshader").text()
+								});
+								*/
+								shaderMaterial = new THREE.ParticleSystemMaterial({
+									vertexColors: true,
+									size: 4
 								});
 
 
@@ -287,7 +298,9 @@
 									for (var i = 0 ; i < ls.length ; i ++) {
 										var r = ls[i];
 										var c = new THREE.Color();
-										c.setRGB(i / (1.0*ls.length), 0, 0);
+										var c1 = 0.2 * i / (1.0*ls.length);
+
+										c.setRGB(c1, c1, c1);
 										var g = new THREE.CylinderGeometry(r, r, 1.0, 40, 1, false);
 										var m = new THREE.MeshBasicMaterial( { color: c, overdraw: true } );
 										

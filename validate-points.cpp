@@ -53,9 +53,13 @@ bool validateFile(const std::string& filename) {
 		f.read(reinterpret_cast<char*>(record), sizeof(record));
 		float x = record[0], y = record[1], z = record[2];
 
-		bool c = (x < l || x > r || y < t || y > b);
+		bool c = (x >= l && x <= r && y >= t && y <= b);
 		if (c) in ++;
 		else out ++;
+
+		if (!c) {
+			//std::cout << "FAILED: " << x << ", " << y << std::endl;
+		}
 
 		allGood &= c;
 	}

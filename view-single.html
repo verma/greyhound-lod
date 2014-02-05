@@ -129,19 +129,21 @@
 
 							var pos = geom.attributes.position.array;
 							var col = geom.attributes.color.array;
-							for (var i = 0, il = pos.length ; i < il ; i += 3) {
-								pos[i] = floatArray[i];
-								pos[i+2] = floatArray[i+1];
+							var si = 0;
+							for (var i = 0, il = pos.length ; i < il ; i += 3, si += 6) {
+								pos[i] = floatArray[si];
+								pos[i+1] = floatArray[si+1];
 
 								if (pos[i] < n.x || pos[i] > n.x + n.w ||
-										pos[i+2] < n.y || pos[i+2] > n.y + n.h) {
-									console.log("OOB", pos[i], pos[i+2]);
+										pos[i+1] < n.y || pos[i+1] > n.y + n.h) {
+									console.log("OOB", i, pos[i], pos[i+1]);
 								}
-								pos[i+1] = floatArray[i+2];
 
-								col[i] = floatArray[i+3];
-								col[i+1] = floatArray[i+4];
-								col[i+2] = floatArray[i+5];
+								pos[i+2] = floatArray[si+2];
+
+								col[i] = floatArray[si+3];
+								col[i+1] = floatArray[si+4];
+								col[i+2] = floatArray[si+5];
 							}
 
 							return geom;
@@ -195,7 +197,7 @@
 
 							promise.then(function(ps) {
 								// set orthotgraphic projection
-								var marginF = 0.0;
+								var marginF = 1.0;
 								var wf = node.w * marginF;
 								var hf = node.h * marginF;
 
@@ -219,8 +221,9 @@
 
 								console.log(x, z);
 
-								cameraO.position.set(x, 400, z);
-								cameraO.lookAt(new THREE.Vector3(x, 0, z));
+								cameraO.position.set(0, 0, 1000);
+								//cameraO.position.set(x,z,1000);
+								//cameraO.lookAt(new THREE.Vector3(x, z, 0));
 
 								scene.add(ps);
 

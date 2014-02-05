@@ -18,7 +18,8 @@ std::string file_name(ssize_t x, ssize_t z, ssize_t width, ssize_t height) {
 	return sstr.str();
 }
 
-void readBuffer (double minx, double miny, double maxx, double maxy, const std::string& filename, double normx, double normy, double tscale) {
+void readBuffer (double minx, double miny, double maxx, double maxy, const std::string& filename, double normx, double normy, double tscale,
+		size_t sizex, size_t sizey) {
 	pdal::Options readerOptions;
 	readerOptions.add("connection", "host='localhost' dbname='lidar' user='lidar'");
 	readerOptions.add("table", "lidar");
@@ -69,8 +70,18 @@ void readBuffer (double minx, double miny, double maxx, double maxy, const std::
 			continue; // this point is not in our region, quick filter
 		}
 
-		x_ = (x_ - normx) * tscale;
-		y_ = (y_ - normy) * tscale;
+		float nx_ = (x_ - normx) * tscale - sizex / 2;
+		float ny_ = (y_ - normy) * tscale - sizey / 2;
+
+		/*
+		//if (i % 1000 == 0) {
+			std::cout << x_ << ", " << y_ << " -> " << nx_ << ", " << ny_ <<
+				" norms: " << normx << ", " << normy << " tscale: " << tscale << std::endl;
+		//}
+		*/
+
+		x_ = -nx_;
+		y_ = ny_;
 
 		float r_ = (float)pbuf.getField<boost::uint8_t>(r, i) / 255.0f,
 			  g_ = (float)pbuf.getField<boost::uint8_t>(g, i) / 255.0f,
@@ -111,5 +122,5 @@ int main(int argc, char *argv[]) {
 	double _normx = atof(argv[10]);
 	double _normy = atof(argv[11]);
 
-	readBuffer(_xs, _ys, _xe, _ye, "./data/" + file_name(x, y, leafNodeSize, leafNodeSize), _normx, _normy, _tscale);
+	readBuffer(_xs, _ys, _xe, _ye, "./data/" + file_name(x, y, leafNodeSize, leafNodeSize), _normx, _normy, _tscale, terrainSize, terrainSize);
 }

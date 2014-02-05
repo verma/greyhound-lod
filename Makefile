@@ -6,8 +6,10 @@ TARGET=gen-large-terrain
 TARGET2=fetch-terrain
 TARGET3=mipmap-terrain
 TARGET4=validate-points
+TARGET5=query-raw
+TARGET6=tail-points
 
-all: $(TARGET2) $(TARGET3) $(TARGET4)
+all: $(TARGET2) $(TARGET3) $(TARGET4) $(TARGET5) $(TARGET6)
 
 $(TARGET): gen-large-terrain.cpp
 	$(CC) -o $@ $(CFLAGS) $(LDFLAGS) $< -lnoise
@@ -21,8 +23,16 @@ $(TARGET3): mipmap-terrain.cpp
 $(TARGET4) : validate-points.cpp
 	$(CC) -o $@ $(CFLAGS) $< $(LDFLAGS)
 
+$(TARGET5) : query-raw.cpp
+	$(CC) -o $@ $(CFLAGS) $< $(LDFLAGS) -lpdalcpp
+
+$(TARGET6) : tail-points.cpp
+	$(CC) -o $@ $(CFLAGS) $< $(LDFLAGS)
+
 clean:
 	rm -rf $(TARGET)
 	rm -rf $(TARGET2)
 	rm -rf $(TARGET3)
 	rm -rf $(TARGET4)
+	rm -rf $(TARGET5)
+	rm -rf $(TARGET6);

@@ -131,20 +131,22 @@
 
 							var pos = geom.attributes.position.array;
 							var col = geom.attributes.color.array;
+							var si = 0;
 							for (var i = 0, il = pos.length ; i < il ; i += 3) {
-								pos[i] = floatArray[i] - qTree.w/2;
-								pos[i+2] = floatArray[i+1] - qTree.h/2;
+								pos[i] = floatArray[si]; //- qTree.w/2;
+								pos[i+2] = floatArray[si+1]; // - qTree.h/2;
 
 								if (i/3 < 10) {
 									console.log(floatArray[i], floatArray[i+1]);
 									console.log("-->", pos[i], pos[i+2]);
 								}
 
-								pos[i+1] = floatArray[i+2];
+								pos[i+1] = floatArray[si+2];
 
-								col[i] = floatArray[i+3];
-								col[i+1] = floatArray[i+4];
-								col[i+2] = floatArray[i+5];
+								col[i] = floatArray[si+3];
+								col[i+1] = floatArray[si+4];
+								col[i+2] = floatArray[si+5];
+								si += 6;
 							}
 
 							return geom;
@@ -162,13 +164,16 @@
 							};
 							console.log(eyePos);
 
-							//qTree.lodQuery(eyePos, function(node) {
-								//nodes.push(node);
-							//});
+							qTree.lodQuery(eyePos, function(node) {
+								nodes.push(node);
+							});
+								/*
 							nodes = _.filter(qTree.allNodes(), function(n) {
+								return n.depth === 0;
 								return n.x === n.y &&
 								n.w === 512 && n.h === 512;
 							});
+								*/
 							//nodes = qTree.allNodes();
 
 							console.log("Total nodes in tree: ", qTree.allNodes().length);
@@ -178,9 +183,11 @@
 							var nodes = _.uniq(nodes);
 							console.log('Unique nodes:', nodes.length);
 
+							/*
 							nodes = _.filter(nodes, function(n) {
 								return n.depth === 0;
 							});
+							*/
 
 
 							var newNodes = _.difference(nodes, nodesInScene);

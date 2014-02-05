@@ -3,8 +3,8 @@ var exec = require('child_process').exec,
 	pg = require('pg'); 
 
 var
-	terrainSize = 1 << 14,
-	leafSize = 1 << 8;
+	terrainSize = 1 << 13,
+	leafSize = 1 << 10;
 
 var getDataDimensions = function(cb) {
 	var conString = "postgres://lidar@localhost/lidar";
@@ -46,7 +46,7 @@ var getRegion = function(cb) {
 			x: dims.left + (dims.right - dims.left) / 2,
 			y: dims.top + (dims.bottom - dims.top) / 2 };
 
-		var s = 0.3;
+		var s = 0.4;
 
 		cb(null, {
 			left: center.x - dr / 2.0 * s,
@@ -54,7 +54,7 @@ var getRegion = function(cb) {
 			top: center.y - dr / 2.0 * s,
 			bottom: center.y + dr / 2.0 * s,
 
-			size: dr * s
+			size: dr / 2.0 * s
 		});
 	});
 };
@@ -72,23 +72,17 @@ var go = function() {
 
 		for (var y = 0 ; y < terrainSize ; y += leafSize) {
 			for (var x = 0 ; x < terrainSize ; x += leafSize) {
-				var lf = (terrainSize - x - leafSize) * f, rf = (terrainSize - x) * f,
+				var lf = x * f, rf = (x+leafSize) * f,
 					tf = y * f, bf = (y+leafSize) * f;
 
 				var l = fx(lf), r = fx(rf), t = fy(tf), b = fy(bf);
-				var command = "./fetch-terrain " + (x - terrainSize/2) + " " + (y - terrainSize/2) + " " + terrainSize + " " + leafSize + " " +
-					l + " " + r + " " + t + " " + b + " " + tscale + " " + normx + " " + normy;
+				var command = "./query-raw " + l + " " + r + " " + t + " " + b + " " + normx + " " + normy;
 				console.log(command);
 				var code =
 					execSync(command);
 
-				var filename = "data/data." + (x - terrainSize/2) + "." + (y - terrainSize/2) + "."
-					+ (x-terrainSize/2+leafSize) + "." + (y-terrainSize/2+leafSize);
-
-				var code =
-					execSync("./validate-points " + filename);
 				if (code !== 0)
-					throw new Error("Validation failed");
+					throw new Error("ZEROS DETECTED");
 			}
 		}
 	});
