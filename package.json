@@ -1,0 +1,11 @@
+{
+  "name": "lod-research",
+  "version": "0.0.0",
+  "description": "",
+  "dependencies": {
+    "pg": "~2.11.1",
+    "execSync": "~1.0.1-pre"
+  },
+  "devDependencies": {},
+  "author": "Uday Verma"
+}
