@@ -33,6 +33,7 @@
                 <script src="QuadTree.js"></script>
 				<script type="x-shader/x-vertex" id="vertexshader">
 						attribute vec3 color;
+						attribute float intensity;
 
 						varying vec4 col;
 
@@ -40,7 +41,9 @@
 								vec3 fpos = vec3(position.x, position.y < 100.0 ? 100.0 : position.y, position.z);
                                 vec4 mvPosition = modelViewMatrix * vec4( fpos, 1.0 );
                                 gl_Position = projectionMatrix * mvPosition;
-								col = vec4(color, 1.0);
+								//col = vec4(color, 1.0);
+								float c = intensity / 100.0;
+								col = vec4(c, c, c, 1.0);
                         }
 
                 </script>
@@ -119,31 +122,36 @@
 							$("#info").html(formatSize(len));
 						}
 
-						function bufferToGeometry(data, n) {
-							console.log(data.byteLength, data.byteLength / 24);
-
+						function bufferToGeometry(data) {
+							var floatsInRecord = 7;
+							var recordSize = floatsInRecord*4;
+							console.log(data.byteLength, data.byteLength / recordSize);
 							var floatArray = new Float32Array(data);
+
 							var geom = new THREE.BufferGeometry();
-							geom.addAttribute('position', Float32Array, floatArray.length / 6, 3);
-							geom.addAttribute('color', Float32Array, floatArray.length / 6, 3);
+							geom.addAttribute('position', Float32Array, floatArray.length / floatsInRecord, 3);
+							geom.addAttribute('color', Float32Array, floatArray.length / floatsInRecord, 3);
+							geom.addAttribute('intensity', Float32Array, floatArray.length / floatsInRecord, 1);
 
 							var pos = geom.attributes.position.array;
 							var col = geom.attributes.color.array;
+							var intensity = geom.attributes.intensity.array;
+
 							var si = 0;
-							for (var i = 0, il = pos.length ; i < il ; i += 3, si += 6) {
+							for (var i = 0, il = pos.length ; i < il ; i += 3) {
 								pos[i] = floatArray[si];
 								pos[i+1] = floatArray[si+1];
-
-								if (pos[i] < n.x || pos[i] > n.x + n.w ||
-										pos[i+1] < n.y || pos[i+1] > n.y + n.h) {
-									console.log("OOB", i, pos[i], pos[i+1]);
-								}
-
-								pos[i+2] = floatArray[si+2];
+								pos[i+2] = floatArray[si+2]; // don't touch the height
 
 								col[i] = floatArray[si+3];
 								col[i+1] = floatArray[si+4];
 								col[i+2] = floatArray[si+5];
+
+								intensity[i] = floatArray[si+6];
+								if (i < 10)
+									console.log(intensity[i]);
+
+								si += 7;
 							}
 
 							return geom;
@@ -154,7 +162,7 @@
 
 							var node = {
 								x: 0, y: 0,
-								w: 512, h: 512 };
+								w: 1024, h: 1024 };
 
 							console.log("Fetching node", node);
 
@@ -244,7 +252,15 @@
 
                                 scene = new THREE.Scene();
 
+								var attributes =
+								{
+									color: { type: 'c', value: null},
+									intensity: { type: 'f', value: null},
+								};
+
+
 								shaderMaterial = new THREE.ShaderMaterial({
+									attributes: attributes,
 									vertexShader: $("#vertexshader").text(),
 									fragmentShader: $("#fragmentshader").text()
 								});

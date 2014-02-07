@@ -55,11 +55,13 @@ void readBuffer (double minx, double miny, double maxx, double maxy, const std::
 	pdal::Dimension const& g = pbuf.getSchema().getDimension("Green");
 	pdal::Dimension const& b = pbuf.getSchema().getDimension("Blue");
 
+	pdal::Dimension const& intensity = pbuf.getSchema().getDimension("Intensity");
 
 	std::cout << "Writing to: " << filename << ", total uncropped: " << pReader->getNumPoints() << " points." << std::endl;
 
 	std::ofstream outfile(filename, std::ios::binary);
 	size_t in = 0, out = 0;
+	float max_in_ = 0.0;
 	for (size_t i = 0, il = pReader->getNumPoints() ; i < il ; i ++) {
 		float x_ = static_cast<float>(x.applyScaling(pbuf.getField<int>(x, i))),
 			  y_ = static_cast<float>(y.applyScaling(pbuf.getField<int>(y, i))),
@@ -87,6 +89,8 @@ void readBuffer (double minx, double miny, double maxx, double maxy, const std::
 			  g_ = (float)pbuf.getField<boost::uint8_t>(g, i) / 255.0f,
 			  b_ = (float)pbuf.getField<boost::uint8_t>(b, i) / 255.0f;
 
+		float in_ = (float)pbuf.getField<boost::uint16_t>(intensity, i);
+
 		outfile.write((char*)&x_, sizeof(float));
 		outfile.write((char*)&y_, sizeof(float));
 		outfile.write((char*)&z_, sizeof(float));
@@ -94,11 +98,15 @@ void readBuffer (double minx, double miny, double maxx, double maxy, const std::
 		outfile.write((char*)&r_, sizeof(float));
 		outfile.write((char*)&g_, sizeof(float));
 		outfile.write((char*)&b_, sizeof(float));
+
+		outfile.write((char*)&in_, sizeof(float));
 		in++;
+
+		max_in_ = in_ > max_in_ ? in_ : max_in_;
 	}
 	outfile.close();
 
-	std::cout << "Volume point stats: inside: " << in << ", out: " << out << std::endl;
+	std::cout << "Volume point stats: inside: " << in << ", out: " << out << ", max intensity: " << max_in_ << std::endl;
 
 	/*
 	if (stage->getNumPoints() > 0)

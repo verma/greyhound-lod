@@ -21,6 +21,7 @@
 							top: 20px;
 							right: 20px;
 						}
+
                 </style>
         </head>
         <body>
@@ -32,7 +33,11 @@
                 <script src="FirstPersonControls.js"></script>
                 <script src="QuadTree.js"></script>
 				<script type="x-shader/x-vertex" id="vertexshader">
+						uniform float pointSize;
+						uniform float blendFactor;
+
 						attribute vec3 color;
+						attribute float intensity;
 
 						varying vec4 col;
 
@@ -42,14 +47,12 @@
 
                                 vec4 mvPosition = modelViewMatrix * vec4( fpos, 1.0 );
                                 gl_Position = projectionMatrix * mvPosition;
-								if (position.y < 100.0)
-									col = vec4(0.0, 0.0, 0.5, 1.0);
-								else if(position.y < 190.0)
-									col = vec4(0.0, 1.0, 0.0, 1.0);
-								else
-									col = vec4(1.0, 1.0, 1.0, 1.0);
 
-								col = vec4(color, 1.0);
+								float i = intensity / 50.0;
+								vec3 intensityColor = vec3(i, i, i);
+
+								gl_PointSize = pointSize;
+								col = vec4(intensityColor * blendFactor + color * (1.0 - blendFactor), 1.0);
                         }
 
                 </script>
@@ -129,16 +132,22 @@
 						}
 
 						function bufferToGeometry(data) {
-							console.log(data.byteLength, data.byteLength / 24);
+							var floatsInRecord = 7;
+							var recordSize = floatsInRecord*4;
+							console.log(data.byteLength, data.byteLength / recordSize);
 							var floatArray = new Float32Array(data);
+
 							var geom = new THREE.BufferGeometry();
-							geom.addAttribute('position', Float32Array, floatArray.length / 6, 3);
-							geom.addAttribute('color', Float32Array, floatArray.length / 6, 3);
+							geom.addAttribute('position', Float32Array, floatArray.length / floatsInRecord, 3);
+							geom.addAttribute('color', Float32Array, floatArray.length / floatsInRecord, 3);
+							geom.addAttribute('intensity', Float32Array, floatArray.length / floatsInRecord, 1);
 
 							var pos = geom.attributes.position.array;
 							var col = geom.attributes.color.array;
+							var intensity = geom.attributes.intensity.array;
+
 							var si = 0;
-							for (var i = 0, il = pos.length ; i < il ; i += 3, si+=6) {
+							for (var i = 0, il = pos.length ; i < il ; i += 3, si+=7) {
 								pos[i] = floatArray[si];
 								pos[i+2] = floatArray[si+1];
 								pos[i+1] = floatArray[si+2]; // don't touch the height
@@ -147,7 +156,8 @@
 								col[i+1] = floatArray[si+4];
 								col[i+2] = floatArray[si+5];
 
-								si += 6;
+								intensity[i/3] = floatArray[si+6];
+
 							}
 
 							return geom;
@@ -263,16 +273,27 @@
 
                                 scene = new THREE.Scene();
 
-								/*
+								var attributes = {
+									color: { type: 'c', value: null },
+									intensity: { type: 'f', value: null} };
+
+								var uniforms = {
+									pointSize: { type: 'f', value: 3.0 },
+								   blendFactor: { type: 'f', value: 0.5 }
+								};
+
 								shaderMaterial = new THREE.ShaderMaterial({
+									attributes: attributes,
+									uniforms: uniforms,
 									vertexShader: $("#vertexshader").text(),
 									fragmentShader: $("#fragmentshader").text()
 								});
-								*/
+								/*
 								shaderMaterial = new THREE.ParticleSystemMaterial({
 									vertexColors: true,
 									size: 2
 								});
+								*/
 
 
                                 renderer = new THREE.WebGLRenderer();
@@ -280,6 +301,14 @@
                                 renderer.setSize( window.innerWidth, window.innerHeight );
 
                                 container.appendChild( renderer.domElement );
+
+								$("body").keypress(function(e) {
+										if (e.which === 105) {
+											uniforms.blendFactor.value = Math.min(uniforms.blendFactor.value + 0.1, 1.0);
+										}
+
+									console.log('keypress', e.which)
+								});
 
                                 window.addEventListener( 'resize', onWindowResize, false );
 
@@ -364,7 +393,6 @@
                         }
 
                 </script>
-
         </body>
 </html>
  

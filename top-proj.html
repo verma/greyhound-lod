@@ -122,31 +122,32 @@
 						}
 
 						function bufferToGeometry(data) {
-							console.log(data.byteLength, data.byteLength / 24);
-
+							var floatsInRecord = 7;
+							var recordSize = floatsInRecord*4;
+							console.log(data.byteLength, data.byteLength / recordSize);
 							var floatArray = new Float32Array(data);
 							var geom = new THREE.BufferGeometry();
-							geom.addAttribute('position', Float32Array, floatArray.length / 6, 3);
-							geom.addAttribute('color', Float32Array, floatArray.length / 6, 3);
+							geom.addAttribute('position', Float32Array, floatArray.length / floatsInRecord, 3);
+							geom.addAttribute('color', Float32Array, floatArray.length / floatsInRecord, 3);
+							geom.addAttribute('intensity', Float32Array, floatArray.length / floatsInRecord, 1);
 
 							var pos = geom.attributes.position.array;
 							var col = geom.attributes.color.array;
+							var intensity = geom.attributes.color.intensity;
+
 							var si = 0;
-							for (var i = 0, il = pos.length ; i < il ; i += 3) {
-								pos[i] = floatArray[si]; //- qTree.w/2;
-								pos[i+2] = floatArray[si+1]; // - qTree.h/2;
-
-								if (i/3 < 10) {
-									console.log(floatArray[i], floatArray[i+1]);
-									console.log("-->", pos[i], pos[i+2]);
-								}
-
-								pos[i+1] = floatArray[si+2];
+							for (var i = 0, il = pos.length ; i < il ; i += 3, si+=6) {
+								pos[i] = floatArray[si];
+								pos[i+2] = floatArray[si+1];
+								pos[i+1] = floatArray[si+2]; // don't touch the height
 
 								col[i] = floatArray[si+3];
 								col[i+1] = floatArray[si+4];
 								col[i+2] = floatArray[si+5];
-								si += 6;
+
+								intensity[i] = floatArray[si+6];
+
+								si += 7;
 							}
 
 							return geom;

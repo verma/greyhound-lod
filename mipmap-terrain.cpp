@@ -192,10 +192,10 @@ char *downsample(const std::string& file, size_t& size) {
 	f.read(reinterpret_cast<char *>(pin), in_size);
 	f.close();
 
-	size_t source_size = in_size / 24;
+	size_t source_size = in_size / 28;
 	size_t downsample_size = source_size / 4;
 
-	size = 6 * downsample_size * sizeof(float);
+	size = 7 * downsample_size * sizeof(float);
 
 	std::cout << "source point count: " << source_size << ", downsample size: " << downsample_size
 		<< ", file size: " << size << ", div? " << size % 4 << std::endl;
@@ -207,10 +207,9 @@ char *downsample(const std::string& file, size_t& size) {
 	std::default_random_engine generator;
 	std::uniform_int_distribution<size_t> distribution(0, source_size - 1);
 
-	// go through the entire read buffer and pick every 4th point
 	for (size_t i = 0 ; i < downsample_size ; i ++) {
 		size_t src_i = distribution(generator);
-		float *read_ptr = (pin + 6*src_i);
+		float *read_ptr = (pin + 7*src_i);
 		
 		write_ptr[0] = read_ptr[0];
 		write_ptr[1] = read_ptr[1];
@@ -218,8 +217,9 @@ char *downsample(const std::string& file, size_t& size) {
 		write_ptr[3] = read_ptr[3];
 		write_ptr[4] = read_ptr[4];
 		write_ptr[5] = read_ptr[5];
+		write_ptr[6] = read_ptr[6];
 
-		write_ptr += 6; // move to the beginning of next point
+		write_ptr += 7; // move to the beginning of next point
 	}
 
 	delete [] pin;

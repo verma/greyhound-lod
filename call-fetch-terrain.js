@@ -4,8 +4,8 @@ var exec = require('child_process').exec,
 	pg = require('pg'); 
 
 var
-	terrainSize = 1 << 15,
-	leafSize = 1 << 8;
+	terrainSize = 1 << 12,
+	leafSize = 1 << 10;
 
 var getDataDimensions = function(cb) {
 	var conString = "postgres://lidar@localhost/lidar";
@@ -44,7 +44,7 @@ var getRegion = function(cb) {
 			x: dims.left + (dims.right - dims.left) / 2,
 			y: dims.top + (dims.bottom - dims.top) / 2 };
 
-		var s = 1;
+		var s = 0.1;
 
 		cb(null, {
 			left: center.x - dr / 2.0 * s,

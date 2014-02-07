@@ -11,8 +11,9 @@
 #include <boost/filesystem.hpp>
 
 void printPoint(size_t index, float vals[]) {
-	std::printf("%8ld : %15.5f, %15.5f, %15.5f\n",
-			index, vals[0], vals[1], vals[2]);
+	std::printf("%8ld : %15.5f, %15.5f, %15.5f, (%1.2f, %1.2f, %1.2f) :: (%.2f)\n",
+			index, vals[0], vals[1], vals[2],
+			vals[3], vals[4], vals[5], vals[6]);
 }
 
 size_t num_points(const std::string& filename) {
@@ -27,7 +28,7 @@ bool readFile(size_t offset, size_t count, const std::string& filename) {
 	if (!f.good())
 		throw std::runtime_error("Could not open file for reading");
 
-	float record[6];
+	float record[7];
 
 	f.seekg(sizeof(record) * offset, std::ios::beg);
 

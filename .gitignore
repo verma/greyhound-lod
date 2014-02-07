@@ -1,6 +1,5 @@
 .vagrant/
-data/
-data-bak/
+data*
 *.las
 fetch-terrain
 node_modules/

@@ -50,7 +50,7 @@ bool validateFile(const std::string& filename) {
 		if (!f.good())
 			return false;
 
-		float record[6];
+		float record[7];
 
 		while (!f.eof()) {
 			f.read(reinterpret_cast<char*>(record), sizeof(record));
