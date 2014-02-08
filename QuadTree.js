@@ -98,7 +98,7 @@
 		return thisArr;
 	}
 
-	var QuadTree = function(x, y, w, h, maxDepth) {
+	var QuadTree = function(x, y, w, h, maxDepth, LODLevels) {
 		this.x = x;
 		this.y = y;
 		this.w = w;
@@ -106,15 +106,17 @@
 		this.maxDepth = maxDepth;
 
 		var maxDist = Math.sqrt((w * w)+(h * h));
-		var LODLevels = [];
+		if (LODLevels == undefined) {
+			LODLevels = [];
 
-		var distF = function(i) { return Math.pow(i, 1/5.0); };
+			var distF = function(i) { return Math.pow(i, 1/5.0); };
 
-		var maxVal = distF(maxDepth);
-		console.log('max val', maxVal);
-		for (var i = maxDepth ; i >= 0 ; i--) {
-			LODLevels.push(0.01 + 0.99 * (1.0 - (distF(i) / maxVal)));
+			var maxVal = distF(maxDepth);
+			console.log('max val', maxVal);
+			for (var i = maxDepth ; i >= 0 ; i--) {
+				LODLevels.push(0.005 + 0.995 * (1.0 - (distF(i) / maxVal)));
 
+			}
 		}
 
 		console.log(LODLevels);

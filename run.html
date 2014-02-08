@@ -4,6 +4,7 @@
                 <title>Large scale LiDAR data visualization</title>
                 <meta charset="utf-8">
                 <meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+				<link rel="stylesheet" type="text/css" href="jquery.nouislider.min.css">
                 <style>
                         body {
                                 font-family: sans-serif;
@@ -22,6 +23,43 @@
 							right: 20px;
 						}
 
+						.controls {
+							background-color: #555;
+							position: absolute;
+							bottom: 0px;
+							height: 100px;
+							left: 0px;
+							width: 100%;
+							padding: 15px;
+							box-sizing: border-box;
+						}
+
+						.controls p {
+							padding: 0px;
+							padding-bottom: 10px;
+							color: #eee;
+							text-transform: uppercase;
+							font-size: 12px;
+							margin: 0px;
+							width: 300px;
+						}
+
+						.controls .controls-item {
+							padding: 0px 30px;
+							float: left;
+						}
+
+						.full-width {
+							width: 100%;
+						}
+
+						.clear {
+							float: clear;
+						}
+
+
+
+
                 </style>
         </head>
         <body>
@@ -32,9 +70,12 @@
                 <script src="lodash.js"></script>
                 <script src="FirstPersonControls.js"></script>
                 <script src="QuadTree.js"></script>
+                <script src="jquery.nouislider.min.js"></script>
 				<script type="x-shader/x-vertex" id="vertexshader">
 						uniform float pointSize;
 						uniform float blendFactor;
+						uniform float clampLower;
+						uniform float clampHigher;
 
 						attribute vec3 color;
 						attribute float intensity;
@@ -48,7 +89,7 @@
                                 vec4 mvPosition = modelViewMatrix * vec4( fpos, 1.0 );
                                 gl_Position = projectionMatrix * mvPosition;
 
-								float i = intensity / 50.0;
+								float i = (intensity - clampLower) / (clampHigher - clampLower);
 								vec3 intensityColor = vec3(i, i, i);
 
 								gl_PointSize = pointSize;
@@ -186,9 +227,11 @@
 							var nodes = _.uniq(nodes);
 							console.log('Unique nodes:', nodes.length);
 
+							/*
 							nodes = _.filter(nodes, function(n) {
 								return n.depth <= 3;
 							});
+							*/
 
 
 							var newNodes = _.difference(nodes, nodesInScene);
@@ -225,18 +268,6 @@
 												var geom = bufferToGeometry(data);
 												n.ps = new THREE.ParticleSystem(geom, shaderMaterial);
 
-
-												/*
-												var geom = new THREE.CubeGeometry(n.w, 10, n.h);
-												var r = 1 - n.depth / qTree.maxDepth;
-												var col = new THREE.Color(); col.setRGB(r, r, r);
-												var mat = new THREE.MeshBasicMaterial({ color: col.getHex() });
-
-												var mesh = new THREE.Mesh(geom, mat);
-												mesh.position.set(n.x - n.w/2, 10 - n.depth, n.y - n.h / 2);
-												n.ps = mesh;
-												*/
-
 												return n.ps;
 											});
 										};
@@ -263,10 +294,10 @@
                                 container.appendChild( info );
 
 								var width = window.innerWidth;
-								var height = window.innerHeight;
+								var height = window.innerHeight - 100;
 
                                 camera = new THREE.PerspectiveCamera(85, width / height, 1, 10000);
-								controls = new THREE.FirstPersonControls(camera);
+								controls = new THREE.FirstPersonControls(camera, container);
 								controls.lookSpeed = 0.00001;
 								controls.movementSpeed = 0.1;
 								controls.activeLook = true;
@@ -279,7 +310,9 @@
 
 								var uniforms = {
 									pointSize: { type: 'f', value: 3.0 },
-								   blendFactor: { type: 'f', value: 0.5 }
+								    blendFactor: { type: 'f', value: 0.5 },
+									clampLower: { type: 'f', value: 20.0},
+									clampHigher: { type: 'f', value: 150.0}
 								};
 
 								shaderMaterial = new THREE.ShaderMaterial({
@@ -288,39 +321,68 @@
 									vertexShader: $("#vertexshader").text(),
 									fragmentShader: $("#fragmentshader").text()
 								});
-								/*
-								shaderMaterial = new THREE.ParticleSystemMaterial({
-									vertexColors: true,
-									size: 2
-								});
-								*/
-
 
                                 renderer = new THREE.WebGLRenderer();
 								renderer.setClearColor("#111");
-                                renderer.setSize( window.innerWidth, window.innerHeight );
+                                renderer.setSize( width, height );
 
                                 container.appendChild( renderer.domElement );
 
-								$("body").keypress(function(e) {
-										if (e.which === 105) {
-											uniforms.blendFactor.value = Math.min(uniforms.blendFactor.value + 0.1, 1.0);
+								$('#point-size').noUiSlider({
+										range: [1,20]
+										,start: 4
+										,handles: 1
+										,step: 1
+										,connect: "lower"
+										,serialization: {
+											resolution: 1
 										}
+										,slide: function(){
+											uniforms.pointSize.value = parseFloat($("#point-size").val());
+										}
+									});
 
-									console.log('keypress', e.which)
-								});
+								$('#intensity-clamping').noUiSlider({
+										range: [0,256]
+										,start: [20, 150]
+										,handles: 2
+										,connect: true
+										,serialization: {
+											resolution: 1
+										}
+										,slide: function(){
+											var v = $("#intensity-clamping").val();
+											uniforms.clampLower.value = parseFloat(v[0]);
+											uniforms.clampHigher.value = parseFloat(v[1]);
+										}
+									});
+
+								$('#intensity-blend').noUiSlider({
+										range: [0,100]
+										,start: 50
+										,handles: 1
+										,connect: "lower"
+										,serialization: {
+											resolution: 1
+										}
+										,slide: function(){
+											uniforms.blendFactor.value = parseFloat($("#intensity-blend").val()) / 100.0;
+										}
+									});
 
                                 window.addEventListener( 'resize', onWindowResize, false );
 
 								return getJSON("/points/bounds").then(function(bounds) {
-									camera.position.set(0, 150, 0);
+									camera.position.set(0, 350, -5000);
 									console.log("Region bounds:", bounds);
 
 									var maxDepth = 
 										Math.log((bounds.width * bounds.height) /
 											(bounds.leaf.width * bounds.leaf.height)) / Math.log(4);
 
-									qTree = new QuadTree(bounds.x, bounds.z, bounds.width, bounds.height, maxDepth)
+									var spheres = [0.007, 0.01, 0.02, 0.03, 0.05, 0.07, 1.0];
+									qTree = new QuadTree(bounds.x, bounds.z, bounds.width, bounds.height, maxDepth, spheres)
+									//qTree = new QuadTree(bounds.x, bounds.z, bounds.width, bounds.height, maxDepth)
 
 									var ls = qTree.LODSpheres();
 									console.log(ls);
@@ -353,14 +415,17 @@
 
                         function onWindowResize() {
 
-                                camera.left = window.innerWidth / - 2;
-                                camera.right = window.innerWidth / 2;
-                                camera.top = window.innerHeight / 2;
-                                camera.bottom = window.innerHeight / - 2;
+							var width = window.innerWidth;
+							var height = window.innerHeight - 100;
+
+                                camera.left = w / - 2;
+                                camera.right = w / 2;
+                                camera.top = h / 2;
+                                camera.bottom = h / - 2;
 
                                 camera.updateProjectionMatrix();
 
-                                renderer.setSize( window.innerWidth, window.innerHeight );
+                                renderer.setSize( width, height );
 
                         }
 
@@ -392,7 +457,25 @@
 							renderer.render( scene, camera );
                         }
 
+$(function() {
+});
+
                 </script>
+				<div class="controls">
+					<div class="controls-item">
+						<p>Point Size</p>
+						<div id="point-size"></div>
+					</div>
+					<div class="controls-item">
+						<p>Color-Intensity Blend </p>
+						<div id="intensity-blend"></div>
+					</div>
+					<div class="controls-item">
+						<p>Intensity Clamping</p>
+						<div id="intensity-clamping"></div>
+					</div>
+					<div class="clear"></div>
+				</div>
         </body>
 </html>
  

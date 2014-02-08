@@ -133,10 +133,10 @@
 
 							var pos = geom.attributes.position.array;
 							var col = geom.attributes.color.array;
-							var intensity = geom.attributes.color.intensity;
+							var intensity = geom.attributes.intensity.array;
 
 							var si = 0;
-							for (var i = 0, il = pos.length ; i < il ; i += 3, si+=6) {
+							for (var i = 0, il = pos.length ; i < il ; i += 3, si+=7) {
 								pos[i] = floatArray[si];
 								pos[i+2] = floatArray[si+1];
 								pos[i+1] = floatArray[si+2]; // don't touch the height
@@ -146,8 +146,6 @@
 								col[i+2] = floatArray[si+5];
 
 								intensity[i] = floatArray[si+6];
-
-								si += 7;
 							}
 
 							return geom;
@@ -170,11 +168,11 @@
 							});
 							//nodes = qTree.allNodes();
 								
-							nodes = _.filter(nodes, function(n) {
-								return n.depth <= 2;
+							//nodes = _.filter(nodes, function(n) {
+							//	return n.depth <= 2;
 							//	return n.x === n.y &&
 								//n.w === 512 && n.h === 512;
-							});
+							//});
 
 							console.log("Total nodes in tree: ", qTree.allNodes().length);
 							console.log("Total nodes this query(before filter):", nodes.length);
@@ -220,18 +218,6 @@
 											return getBinary(url).then(function(data) {
 												var geom = bufferToGeometry(data);
 												n.ps = new THREE.ParticleSystem(geom, shaderMaterial);
-
-
-												/*
-												var geom = new THREE.CubeGeometry(n.w, 10, n.h);
-												var r = 1 - n.depth / qTree.maxDepth;
-												var col = new THREE.Color(); col.setRGB(r, r, r);
-												var mat = new THREE.MeshBasicMaterial({ color: col.getHex() });
-
-												var mesh = new THREE.Mesh(geom, mat);
-												mesh.position.set(n.x - n.w/2, 10 - n.depth, n.y - n.h / 2);
-												n.ps = mesh;
-												*/
 
 												return n.ps;
 											});
@@ -286,14 +272,18 @@
                                 window.addEventListener( 'resize', onWindowResize, false );
 
 								return getJSON("/points/bounds").then(function(bounds) {
-									camera.position.set(0, 150, 0);
+									camera.position.set(0, 150, -5000);
+
+									bounds.leaf.width = bounds.leaf.height = 256;
+
 									console.log("Region bounds:", bounds);
 
 									var maxDepth = 
 										Math.log((bounds.width * bounds.height) /
 											(bounds.leaf.width * bounds.leaf.height)) / Math.log(4);
 
-									qTree = new QuadTree(bounds.x, bounds.z, bounds.width, bounds.height, maxDepth)
+									var spheres = [0.005, 0.01, 0.02, 0.03, 0.05, 0.07];
+									qTree = new QuadTree(bounds.x, bounds.z, bounds.width, bounds.height, maxDepth, spheres)
 
 									cameraO = new THREE.OrthographicCamera(bounds.x, bounds.x + bounds.width,
 										bounds.z, bounds.z + bounds.height, 1, 10000);

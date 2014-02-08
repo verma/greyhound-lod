@@ -22,7 +22,10 @@ var staticMap = {
 	"/QuadTree.js": ["QuadTree.js", "application/json; charset=utf-8"],
 	"/three.js": ["three.js", "application/json; charset=utf-8"],
 	"/lodash.js": ["lodash.js", "application/json; charset=utf-8"],
-	"/FirstPersonControls.js": ["FirstPersonControls.js", "application/json; charset=utf-8"]
+	"/downloadWorker.js": ["downloadWorker.js", "application/json; charset=utf-8"],
+	"/FirstPersonControls.js": ["FirstPersonControls.js", "application/json; charset=utf-8"],
+	"/jquery.nouislider.min.js": ["jquery.nouislider.min.js", "application/json; charset=utf-8"],
+	"/jquery.nouislider.min.css": ["jquery.nouislider.min.css", "text/css; charset=utf-8"]
 };
 
 var fourOhFour = function(res) {
