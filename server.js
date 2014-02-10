@@ -21,6 +21,7 @@ var staticMap = {
 	"/jquery.js": ["jquery.js", "application/javascript; charset=utf-8"],
 	"/bluebird.js": ["bluebird.js", "application/javascript; charset=utf-8"],
 	"/QuadTree.js": ["QuadTree.js", "application/javascript; charset=utf-8"],
+	"/ortho-camera.js": ["ortho-camera.js", "application/javascript; charset=utf-8"],
 	"/three.js": ["three.js", "application/javascript; charset=utf-8"],
 	"/lodash.js": ["lodash.js", "application/javascript; charset=utf-8"],
 	"/downloadWorker.js": ["downloadWorker.js", "application/javascript; charset=utf-8"],

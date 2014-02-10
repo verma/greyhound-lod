@@ -70,6 +70,7 @@
                 <script src="lodash.js"></script>
                 <script src="FirstPersonControls.js"></script>
                 <script src="QuadTree.js"></script>
+                <script src="ortho-camera.js"></script>
                 <script src="jquery.nouislider.min.js"></script>
 				<script type="x-shader/x-vertex" id="vertexshader">
 						uniform float pointSize;
@@ -111,10 +112,12 @@
 
                         var container;
                         var camera, scene, renderer;
+						var cameraO;
 						var controls;
 						var qTree;
 						var totalDataDownloaded = 0;
 						var shaderMaterial;
+						var activeCamera = null;
 
 						// jquery doesn't do binary download, so we do it ourselves
 						var getBinary = function(url) {
@@ -311,10 +314,16 @@
 								var height = window.innerHeight - 100;
 
                                 camera = new THREE.PerspectiveCamera(85, width / height, 1, 10000);
+								cameraO = new THREE.OrthographicCamera(-width/2, width/2, height/2, -height/2, 0.01, 100000);
+
+								orthoCameras = new OrthoCameras(width, height);
+
 								controls = new THREE.FirstPersonControls(camera, container);
 								controls.lookSpeed = 0.00001;
 								controls.movementSpeed = 0.1;
 								controls.activeLook = true;
+
+								activeCamera = camera;
 
                                 scene = new THREE.Scene();
 
@@ -431,6 +440,11 @@
                                     // camera.position.set(0, 350, -5000);
 									console.log("Region bounds:", bounds);
 
+									orthoCameras.updatePosition(camera.position);
+
+									cameraO.position.set(camera.position.x, camera.position.y, camera.position.z);
+									cameraO.rotation.set(camera.rotation.x, camera.rotation.y, camera.rotation.z);
+
 									var maxDepth = 
 										Math.log((bounds.width * bounds.height) /
 											(bounds.leaf.width * bounds.leaf.height)) / Math.log(4);
@@ -478,6 +492,15 @@
 							camera.aspect = w / h;
 							camera.updateProjectionMatrix();
 
+							orthoCameras.resize(w, h);
+
+							cameraO.left = -w / 2;
+							cameraO.right = w / 2;
+							cameraO.top = h / 2;
+							cameraO.bottom = -h / 2;
+
+							cameraO.updateProjectionMatrix();
+
 							renderer.setSize( w, h );
 
                         }
@@ -507,6 +530,11 @@
 								lodcircles[i].position.x = camera.position.x;
 								lodcircles[i].position.z = camera.position.z;
 							}
+
+							orthoCameras.updatePosition(camera.position);
+							cameraO.position.set(camera.position.x, camera.position.y, camera.position.z);
+							cameraO.rotation.set(camera.rotation.x, camera.rotation.y, camera.rotation.z);
+							console.log(cameraO.position);
 
 							renderer.render( scene, camera );
                         }
