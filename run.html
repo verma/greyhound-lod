@@ -423,13 +423,17 @@
                                 window.addEventListener( 'resize', onWindowResize, false );
 
 								return getJSON("/points/bounds").then(function(bounds) {
-									camera.position.set(0, 350, -5000);
+                                    // x: , y: , z: 
+                                    // 1205.589666925301, y: 281.491455195053, z: 1779.0332492461114
+									camera.position.set(1205.589666925301, 281.491455195053, 1779.0332492461114);
+                                    var e = new THREE.Euler(0.2634250679870575, -1.2801480135179992, 0.25285097473366813);
+                                    camera.rotation.set(e);
+                                    // camera.position.set(0, 350, -5000);
 									console.log("Region bounds:", bounds);
 
 									var maxDepth = 
 										Math.log((bounds.width * bounds.height) /
 											(bounds.leaf.width * bounds.leaf.height)) / Math.log(4);
-
 
 									var spheres = genLODSpheres(0.007, 0.02, maxDepth + 1);
 									console.log(spheres);

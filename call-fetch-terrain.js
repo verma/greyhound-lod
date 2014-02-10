@@ -4,10 +4,27 @@ var exec = require('child_process').exec,
 	pg = require('pg'); 
 
 var
-	terrainSize = 1 << 12,
-	leafSize = 1 << 10;
+	terrainSize = 1 << 15,
+	leafSize = 1 << 8;
 
 var getDataDimensions = function(cb) {
+    process.nextTick(function(){
+        /* Desmoines + Ames */
+        // var box = "BOX(-10574704.0337897 9385738.60756277,-10523753.8137897 9477412.12756277)";
+        
+        /* Desmoines only */
+        var box = "BOX(-10566763.5537897 9380437.61756277,-10505183.9637897 9420818.28756277)";
+		var parts =
+			box.substring(4, box.length - 1).replace(',', ' ').split(' ');
+            
+        cb(null, {
+			left: parseFloat(parts[0]),
+			top: parseFloat(parts[1]),
+			right: parseFloat(parts[2]),
+			bottom: parseFloat(parts[3])
+		});
+    });
+    /*
 	var conString = "postgres://lidar@localhost/lidar";
 
 	function parseBox(box) {
@@ -32,6 +49,7 @@ var getDataDimensions = function(cb) {
 			cb(null, box);
 		});
 	});
+    */
 };
 
 var getRegion = function(cb) {
@@ -44,7 +62,7 @@ var getRegion = function(cb) {
 			x: dims.left + (dims.right - dims.left) / 2,
 			y: dims.top + (dims.bottom - dims.top) / 2 };
 
-		var s = 0.1;
+		var s = 1;
 
 		cb(null, {
 			left: center.x - dr / 2.0 * s,
