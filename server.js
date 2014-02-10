@@ -18,13 +18,14 @@ var staticMap = {
 	"/": [ "run.html", "text/html"],
 	"/top": ["top-proj.html", "text/html"],
 	"/single": ["view-single.html", "text/html"],
-	"/bluebird.js": ["bluebird.js", "application/json; charset=utf-8"],
-	"/QuadTree.js": ["QuadTree.js", "application/json; charset=utf-8"],
-	"/three.js": ["three.js", "application/json; charset=utf-8"],
-	"/lodash.js": ["lodash.js", "application/json; charset=utf-8"],
-	"/downloadWorker.js": ["downloadWorker.js", "application/json; charset=utf-8"],
-	"/FirstPersonControls.js": ["FirstPersonControls.js", "application/json; charset=utf-8"],
-	"/jquery.nouislider.min.js": ["jquery.nouislider.min.js", "application/json; charset=utf-8"],
+	"/jquery.js": ["jquery.js", "application/javascript; charset=utf-8"],
+	"/bluebird.js": ["bluebird.js", "application/javascript; charset=utf-8"],
+	"/QuadTree.js": ["QuadTree.js", "application/javascript; charset=utf-8"],
+	"/three.js": ["three.js", "application/javascript; charset=utf-8"],
+	"/lodash.js": ["lodash.js", "application/javascript; charset=utf-8"],
+	"/downloadWorker.js": ["downloadWorker.js", "application/javascript; charset=utf-8"],
+	"/FirstPersonControls.js": ["FirstPersonControls.js", "application/javascript; charset=utf-8"],
+	"/jquery.nouislider.min.js": ["jquery.nouislider.min.js", "application/javascript; charset=utf-8"],
 	"/jquery.nouislider.min.css": ["jquery.nouislider.min.css", "text/css; charset=utf-8"]
 };
 
