@@ -1,12 +1,9 @@
 // gen-large-terrain.cpp
-// Generate terrain data in C++ using the awesome libnoise
+// Generate terrain data in C++ using the awesome lib
 // which can be installed using brew directly from the pull request:
 //
 // https://raw2.github.com/krono/homebrew/7382acbeab57af7166be04e4c9afdf610cb727b4/Library/Formula/libnoise.rb
 //
-
-
-#include <libnoise/noise.h>
 
 #include <iostream>
 #include <fstream>
@@ -35,7 +32,6 @@ bool isAllDataAvailable(size_t terrainPower, size_t leafPower);
 
 int main (int argc, char** argv)
 {
-	using namespace noise;
 	using namespace std;
 
 	namespace bf = boost::filesystem;

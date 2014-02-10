@@ -282,7 +282,7 @@
 										Math.log((bounds.width * bounds.height) /
 											(bounds.leaf.width * bounds.leaf.height)) / Math.log(4);
 
-									var spheres = [0.005, 0.01, 0.02, 0.03, 0.05, 0.07];
+        									var spheres = [0.007, 0.083, 0.01, 0.02, 0.03, 0.05, 0.07, 1.0];
 									qTree = new QuadTree(bounds.x, bounds.z, bounds.width, bounds.height, maxDepth, spheres)
 
 									cameraO = new THREE.OrthographicCamera(bounds.x, bounds.x + bounds.width,

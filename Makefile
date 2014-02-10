@@ -1,6 +1,7 @@
 CC=g++
-CFLAGS=-g -O3 -std=c++0x $(shell pkg-config --cflags libpq)
-LDFLAGS=-lstdc++ -lboost_filesystem -lboost_system $(shell pkg-config --libs libpq)
+PDAL_PATH=/Users/hobu/dev/git/pdal/
+CFLAGS=-g -O3 -std=c++0x $(shell pkg-config --cflags libpq) -I$(PDAL_PATH)/include
+LDFLAGS=-lstdc++ -lboost_filesystem -lboost_system $(shell pkg-config --libs libpq) -L$(PDAL_PATH)bin/ -lpdalcpp
 
 TARGET=gen-large-terrain
 TARGET2=fetch-terrain

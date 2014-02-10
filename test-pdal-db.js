@@ -3,7 +3,7 @@ var fs = require('fs');
 //or native libpq bindings
 //var pg = require('pg').native
 
-var conString = "postgres://lidar@localhost/lidar";
+var conString = "postgres://howardbutler@localhost:5432/lidar";
 
 var terrainSize = 1 << 14;
 var leafSize = 1 << 7;
@@ -31,11 +31,13 @@ function parseBox(box) {
 
 
 var client = new pg.Client(conString);
+console.log("Connecting ...");
 client.connect(function(err) {
   if(err) {
     return console.error('Could not connect to postgres', err);
   }
 
+  console.log("... Connected.")
   client.query("select Box2D(pa::geometry) from lidar", function(err, res) {
 	  if (err) return console.log(err);
 
@@ -51,10 +53,9 @@ client.connect(function(err) {
 	  }
 
 	  console.log('Total', boxes.length, 'boxes');
-	  /*
 	  fs.writeFileSync("boxes.json", JSON.stringify(boxes));
 	  console.log('File written');
-	  */
+
 
 
 	  var dims = [dataExtents.right - dataExtents.left, dataExtents.bottom - dataExtents.top];
