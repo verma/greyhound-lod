@@ -283,6 +283,20 @@
 							});
 						}
 
+						function genLODSpheres(first, second, count) {
+							var spheres = [];
+							if (count > 0) spheres.push(first);
+							if (count > 1) spheres.push(second);
+							if (count > 2) {
+								for (var i = 2 ; i < count - 1; i ++) {
+									spheres.push(second + 0.01 * (i-1));
+								}
+
+								spheres.push(1.0);
+							}
+
+							return spheres;
+						}
 
 						var lodcircles = [];
                         function init() {
@@ -369,6 +383,42 @@
 											uniforms.blendFactor.value = parseFloat($("#intensity-blend").val()) / 100.0;
 										}
 									});
+								var lodTriggerTimer = null;
+								$('#lod-controls').noUiSlider({
+										range: [0,100]
+										,start: [35, 50]
+										,handles: 2
+										,connect: false
+										,serialization: {
+											resolution: 1
+										}
+										,slide: function(){
+											if (lodTriggerTimer) {
+												clearTimeout(lodTriggerTimer);
+												lodTriggerTimer = null;
+											}
+
+											var vals = $("#lod-controls").val();
+											var first = parseFloat(vals[0]) / 5000;
+											var second = parseFloat(vals[1]) / 5000;
+
+											// make sure first and second are not the same
+											second = Math.max(second, first + 0.001);
+
+											lodTriggerTimer = setTimeout(function() {
+												lodTriggerTimer = null;
+
+												console.log("Trigger LOD");
+												console.log("first", first, "second", second);
+												var spheres = genLODSpheres(first, second,
+													qTree.numLODSpheresNeeded());
+												console.log(spheres);
+
+												qTree.updateLODSpheres(spheres);
+												doDataQuery();
+											}, 500);
+										}
+									});
 
                                 window.addEventListener( 'resize', onWindowResize, false );
 
@@ -380,9 +430,12 @@
 										Math.log((bounds.width * bounds.height) /
 											(bounds.leaf.width * bounds.leaf.height)) / Math.log(4);
 
-									var spheres = [0.007, 0.01, 0.02, 0.03, 0.05, 0.07, 1.0];
-									qTree = new QuadTree(bounds.x, bounds.z, bounds.width, bounds.height, maxDepth, spheres)
-									//qTree = new QuadTree(bounds.x, bounds.z, bounds.width, bounds.height, maxDepth)
+
+									var spheres = genLODSpheres(0.007, 0.02, maxDepth + 1);
+									console.log(spheres);
+									qTree = new QuadTree(bounds.x, bounds.z,
+										bounds.width, bounds.height,
+										maxDepth, spheres)
 
 									var ls = qTree.LODSpheres();
 									console.log(ls);
@@ -415,17 +468,13 @@
 
                         function onWindowResize() {
 
-							var width = window.innerWidth;
-							var height = window.innerHeight - 100;
+							var w = window.innerWidth;
+							var h = window.innerHeight - 100;
 
-                                camera.left = w / - 2;
-                                camera.right = w / 2;
-                                camera.top = h / 2;
-                                camera.bottom = h / - 2;
+							camera.aspect = w / h;
+							camera.updateProjectionMatrix();
 
-                                camera.updateProjectionMatrix();
-
-                                renderer.setSize( width, height );
+							renderer.setSize( w, h );
 
                         }
 
@@ -437,7 +486,8 @@
 							var d = (last_d === 0 ? 0 : (thisTime - last_d));
 							last_d = thisTime;
 
-							if (lastCameraPos === null || lastCameraPos.distanceToSquared(camera.position) > 1000.0) {
+							if (lastCameraPos === null ||
+									lastCameraPos.distanceToSquared(camera.position) > 1000.0) {
 								lastCameraPos = camera.position.clone();
 
 								doDataQuery();
@@ -457,9 +507,6 @@
 							renderer.render( scene, camera );
                         }
 
-$(function() {
-});
-
                 </script>
 				<div class="controls">
 					<div class="controls-item">
@@ -473,6 +520,10 @@ $(function() {
 					<div class="controls-item">
 						<p>Intensity Clamping</p>
 						<div id="intensity-clamping"></div>
+					</div>
+					<div class="controls-item">
+						<p>LOD Controls</p>
+						<div id="lod-controls"></div>
 					</div>
 					<div class="clear"></div>
 				</div>
