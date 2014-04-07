@@ -1,6 +1,7 @@
 .vagrant/
 data*
 *.las
+*.laz
 fetch-terrain
 node_modules/
 *.vdi

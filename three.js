@@ -4,7 +4,7 @@
  * @author bhouston / http://exocortex.com
  */
 
-var THREE = { REVISION: '65' };
+var THREE = { REVISION: '64' };
 
 self.console = self.console || {
 
@@ -3992,7 +3992,7 @@ THREE.Matrix3.prototype = {
 
 			if ( throwOnInvertible || false ) {
 
-				throw new Error( msg );
+				throw new Error( msg ); 
 
 			} else {
 
@@ -4049,26 +4049,6 @@ THREE.Matrix3.prototype = {
 		r[ 8 ] = m[ 8 ];
 
 		return this;
-
-	},
-
-	fromArray: function ( array ) {
-
-		this.elements.set( array );
-
-		return this;
-
-	},
-
-	toArray: function () {
-
-		var te = this.elements;
-
-		return [
-			te[ 0 ], te[ 1 ], te[ 2 ],
-			te[ 3 ], te[ 4 ], te[ 5 ],
-			te[ 6 ], te[ 7 ], te[ 8 ]
-		];
 
 	},
 
@@ -4928,12 +4908,6 @@ THREE.Matrix4.prototype = {
 			var sx = vector.set( te[0], te[1], te[2] ).length();
 			var sy = vector.set( te[4], te[5], te[6] ).length();
 			var sz = vector.set( te[8], te[9], te[10] ).length();
-
-			// if determine is negative, we need to invert one scale
-			var det = this.determinant();
-			if( det < 0 ) {
-				sx = -sx;
-			}
 
 			position.x = te[12];
 			position.y = te[13];
@@ -7083,51 +7057,10 @@ THREE.EventDispatcher.prototype = {
 					a = vertices[ face.a ];
 					b = vertices[ face.b ];
 					c = vertices[ face.c ];
-
-					if ( material.morphTargets === true ) {
-
-						var morphTargets = geometry.morphTargets;
-						var morphInfluences = object.morphTargetInfluences;
-
-						vA.set( 0, 0, 0 );
-						vB.set( 0, 0, 0 );
-						vC.set( 0, 0, 0 );
-
-						for ( var t = 0, tl = morphTargets.length; t < tl; t ++ ) {
-
-							var influence = morphInfluences[ t ];
-
-							if ( influence === 0 ) continue;
-
-							var targets = morphTargets[ t ].vertices;
-
-							vA.x += ( targets[ face.a ].x - a.x ) * influence;
-							vA.y += ( targets[ face.a ].y - a.y ) * influence;
-							vA.z += ( targets[ face.a ].z - a.z ) * influence;
-
-							vB.x += ( targets[ face.b ].x - b.x ) * influence;
-							vB.y += ( targets[ face.b ].y - b.y ) * influence;
-							vB.z += ( targets[ face.b ].z - b.z ) * influence;
-
-							vC.x += ( targets[ face.c ].x - c.x ) * influence;
-							vC.y += ( targets[ face.c ].y - c.y ) * influence;
-							vC.z += ( targets[ face.c ].z - c.z ) * influence;
-
-						}
-
-						vA.add( a );
-						vB.add( b );
-						vC.add( c );
-
-						a = vA;
-						b = vB;
-						c = vC;
-
-					}
-
+					
 					if ( material.side === THREE.BackSide ) {
 							
-						var intersectionPoint = localRay.intersectTriangle( c, b, a, true );
+						var intersectionPoint = localRay.intersectTriangle( c, b, a, true ); 
 
 					} else {
 								
@@ -7394,13 +7327,25 @@ THREE.Object3D.prototype = {
 
 	},
 
-	applyMatrix: function ( matrix ) {
+	applyMatrix: function () {
 
-		this.matrix.multiplyMatrices( matrix, this.matrix );
+		var m1 = new THREE.Matrix4();
 
-		this.matrix.decompose( this.position, this.quaternion, this.scale );
+		return function ( matrix ) {
 
-	},
+			this.matrix.multiplyMatrices( matrix, this.matrix );
+
+			this.position.setFromMatrixPosition( this.matrix );
+
+			this.scale.setFromMatrixScale( this.matrix );
+
+			m1.extractRotation( this.matrix );
+
+			this.quaternion.setFromRotationMatrix( m1 );
+
+		}
+
+	}(),
 
 	setRotationFromAxisAngle: function ( axis, angle ) {
 
@@ -7862,10 +7807,6 @@ THREE.Projector = function () {
 
 	_renderData = { objects: [], sprites: [], lights: [], elements: [] },
 
-	_vA = new THREE.Vector3(),
-	_vB = new THREE.Vector3(),
-	_vC = new THREE.Vector3(),
-
 	_vector3 = new THREE.Vector3(),
 	_vector4 = new THREE.Vector4(),
 
@@ -7900,20 +7841,15 @@ THREE.Projector = function () {
 
 	};
 
-	this.unprojectVector = function () {
+	this.unprojectVector = function ( vector, camera ) {
 
-		var projectionMatrixInverse = new THREE.Matrix4();
+		camera.projectionMatrixInverse.getInverse( camera.projectionMatrix );
 
-		return function ( vector, camera ) {
+		_viewProjectionMatrix.multiplyMatrices( camera.matrixWorld, camera.projectionMatrixInverse );
 
-			projectionMatrixInverse.getInverse( camera.projectionMatrix );
-			_viewProjectionMatrix.multiplyMatrices( camera.matrixWorld, projectionMatrixInverse );
+		return vector.applyProjection( _viewProjectionMatrix );
 
-			return vector.applyProjection( _viewProjectionMatrix );
-
-		};
-
-	}();
+	};
 
 	this.pickingRay = function ( vector, camera ) {
 
@@ -7950,27 +7886,6 @@ THREE.Projector = function () {
 		}
 
 		return _object;
-
-	};
-
-	var projectVertex = function ( vertex ) {
-
-		var position = vertex.position;
-		var positionWorld = vertex.positionWorld;
-		var positionScreen = vertex.positionScreen;
-
-		positionWorld.copy( position ).applyMatrix4( _modelMatrix );
-		positionScreen.copy( positionWorld ).applyMatrix4( _viewProjectionMatrix );
-
-		var invW = 1 / positionScreen.w;
-
-		positionScreen.x *= invW;
-		positionScreen.y *= invW;
-		positionScreen.z *= invW;
-
-		vertex.visible = positionScreen.x >= -1 && positionScreen.x <= 1 &&
-				 positionScreen.y >= -1 && positionScreen.y <= 1 &&
-				 positionScreen.z >= -1 && positionScreen.z <= 1;
 
 	};
 
@@ -8025,7 +7940,8 @@ THREE.Projector = function () {
 	this.projectScene = function ( scene, camera, sortObjects, sortElements ) {
 
 		var visible = false,
-		object, geometry, vertices, faces, face, faceVertexNormals, faceVertexUvs, uvs,
+		o, ol, v, vl, f, fl, n, nl, c, cl, u, ul, object,
+		geometry, vertices, faces, face, faceVertexNormals, faceVertexUvs, uvs,
 		v1, v2, v3, v4, isFaceMaterial, objectMaterials;
 
 		_face3Count = 0;
@@ -8046,7 +7962,7 @@ THREE.Projector = function () {
 
 		projectGraph( scene, sortObjects );
 
-		for ( var o = 0, ol = _renderData.objects.length; o < ol; o ++ ) {
+		for ( o = 0, ol = _renderData.objects.length; o < ol; o ++ ) {
 
 			object = _renderData.objects[ o ].object;
 
@@ -8067,16 +7983,26 @@ THREE.Projector = function () {
 				isFaceMaterial = object.material instanceof THREE.MeshFaceMaterial;
 				objectMaterials = isFaceMaterial === true ? object.material : null;
 
-				for ( var v = 0, vl = vertices.length; v < vl; v ++ ) {
+				for ( v = 0, vl = vertices.length; v < vl; v ++ ) {
 
 					_vertex = getNextVertexInPool();
-					_vertex.position.copy( vertices[ v ] );
 
-					projectVertex( _vertex );
+					_vertex.positionWorld.copy( vertices[ v ] ).applyMatrix4( _modelMatrix );
+					_vertex.positionScreen.copy( _vertex.positionWorld ).applyMatrix4( _viewProjectionMatrix );
+
+					var invW = 1 / _vertex.positionScreen.w;
+
+					_vertex.positionScreen.x *= invW;
+					_vertex.positionScreen.y *= invW;
+					_vertex.positionScreen.z *= invW;
+
+					_vertex.visible = ! ( _vertex.positionScreen.x < -1 || _vertex.positionScreen.x > 1 ||
+							      _vertex.positionScreen.y < -1 || _vertex.positionScreen.y > 1 ||
+							      _vertex.positionScreen.z < -1 || _vertex.positionScreen.z > 1 );
 
 				}
 
-				for ( var f = 0, fl = faces.length; f < fl; f ++ ) {
+				for ( f = 0, fl = faces.length; f < fl; f ++ ) {
 
 					face = faces[ f ];
 
@@ -8091,51 +8017,6 @@ THREE.Projector = function () {
 					v1 = _vertexPool[ face.a ];
 					v2 = _vertexPool[ face.b ];
 					v3 = _vertexPool[ face.c ];
-
-					if ( material.morphTargets === true ) {
-
-						var morphTargets = geometry.morphTargets;
-						var morphInfluences = object.morphTargetInfluences;
-
-						var v1p = v1.position;
-						var v2p = v2.position;
-						var v3p = v3.position;
-
-						_vA.set( 0, 0, 0 );
-						_vB.set( 0, 0, 0 );
-						_vC.set( 0, 0, 0 );
-
-						for ( var t = 0, tl = morphTargets.length; t < tl; t ++ ) {
-
-							var influence = morphInfluences[ t ];
-
-							if ( influence === 0 ) continue;
-
-							var targets = morphTargets[ t ].vertices;
-
-							_vA.x += ( targets[ face.a ].x - v1p.x ) * influence;
-							_vA.y += ( targets[ face.a ].y - v1p.y ) * influence;
-							_vA.z += ( targets[ face.a ].z - v1p.z ) * influence;
-
-							_vB.x += ( targets[ face.b ].x - v2p.x ) * influence;
-							_vB.y += ( targets[ face.b ].y - v2p.y ) * influence;
-							_vB.z += ( targets[ face.b ].z - v2p.z ) * influence;
-
-							_vC.x += ( targets[ face.c ].x - v3p.x ) * influence;
-							_vC.y += ( targets[ face.c ].y - v3p.y ) * influence;
-							_vC.z += ( targets[ face.c ].z - v3p.z ) * influence;
-
-						}
-
-						v1.position.add( _vA );
-						v2.position.add( _vB );
-						v3.position.add( _vC );
-
-						projectVertex( v1 );
-						projectVertex( v2 );
-						projectVertex( v3 );
-
-					}
 
 					_points3[ 0 ] = v1.positionScreen;
 					_points3[ 1 ] = v2.positionScreen;
@@ -8186,7 +8067,7 @@ THREE.Projector = function () {
 
 					faceVertexNormals = face.vertexNormals;
 
-					for ( var n = 0, nl = Math.min( faceVertexNormals.length, 3 ); n < nl; n ++ ) {
+					for ( n = 0, nl = Math.min( faceVertexNormals.length, 3 ); n < nl; n ++ ) {
 
 						var normalModel = _face.vertexNormalsModel[ n ];
 						normalModel.copy( faceVertexNormals[ n ] );
@@ -8206,13 +8087,13 @@ THREE.Projector = function () {
 
 					_face.vertexNormalsLength = faceVertexNormals.length;
 
-					for ( var c = 0, cl = Math.min( faceVertexUvs.length, 3 ); c < cl; c ++ ) {
+					for ( c = 0, cl = Math.min( faceVertexUvs.length, 3 ); c < cl; c ++ ) {
 
 						uvs = faceVertexUvs[ c ][ f ];
 
 						if ( uvs === undefined ) continue;
 
-						for ( var u = 0, ul = uvs.length; u < ul; u ++ ) {
+						for ( u = 0, ul = uvs.length; u < ul; u ++ ) {
 
 							_face.uvs[ c ][ u ] = uvs[ u ];
 
@@ -8709,11 +8590,36 @@ THREE.Geometry.prototype = {
 
 		var v, vl, f, fl, face, vertices;
 
-		vertices = new Array( this.vertices.length );
+		// create internal buffers for reuse when calling this method repeatedly
+		// (otherwise memory allocation / deallocation every frame is big resource hog)
 
-		for ( v = 0, vl = this.vertices.length; v < vl; v ++ ) {
+		if ( this.__tmpVertices === undefined ) {
 
-			vertices[ v ] = new THREE.Vector3();
+			this.__tmpVertices = new Array( this.vertices.length );
+			vertices = this.__tmpVertices;
+
+			for ( v = 0, vl = this.vertices.length; v < vl; v ++ ) {
+
+				vertices[ v ] = new THREE.Vector3();
+
+			}
+
+			for ( f = 0, fl = this.faces.length; f < fl; f ++ ) {
+
+				face = this.faces[ f ];
+				face.vertexNormals = [ new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3() ];
+
+			}
+
+		} else {
+
+			vertices = this.__tmpVertices;
+
+			for ( v = 0, vl = this.vertices.length; v < vl; v ++ ) {
+
+				vertices[ v ].set( 0, 0, 0 );
+
+			}
 
 		}
 
@@ -8768,9 +8674,9 @@ THREE.Geometry.prototype = {
 
 			face = this.faces[ f ];
 
-			face.vertexNormals[ 0 ] = vertices[ face.a ].clone();
-			face.vertexNormals[ 1 ] = vertices[ face.b ].clone();
-			face.vertexNormals[ 2 ] = vertices[ face.c ].clone();
+			face.vertexNormals[ 0 ].copy( vertices[ face.a ] );
+			face.vertexNormals[ 1 ].copy( vertices[ face.b ] );
+			face.vertexNormals[ 2 ].copy( vertices[ face.c ] );
 
 		}
 
@@ -9060,6 +8966,9 @@ THREE.Geometry.prototype = {
 		var i,il, face;
 		var indices, k, j, jl, u;
 
+		// reset cache of vertices as it now will be changing.
+		this.__tmpVertices = undefined;
+
 		for ( i = 0, il = this.vertices.length; i < il; i ++ ) {
 
 			v = this.vertices[ i ];
@@ -9113,7 +9022,7 @@ THREE.Geometry.prototype = {
 
 		for ( i = faceIndicesToRemove.length - 1; i >= 0; i -- ) {
 			var idx = faceIndicesToRemove[ i ];
-
+			
 			this.faces.splice( idx, 1 );
 
 			for ( j = 0, jl = this.faceVertexUvs.length; j < jl; j ++ ) {
@@ -9352,8 +9261,6 @@ THREE.BufferGeometry.prototype = {
 			var positions = this.attributes[ "position" ].array;
 
 			if ( positions ) {
-
-				box.makeEmpty();
 
 				var center = this.boundingSphere.center;
 
@@ -9828,7 +9735,9 @@ THREE.Camera = function () {
 	THREE.Object3D.call( this );
 
 	this.matrixWorldInverse = new THREE.Matrix4();
+
 	this.projectionMatrix = new THREE.Matrix4();
+	this.projectionMatrixInverse = new THREE.Matrix4();
 
 };
 
@@ -9858,6 +9767,7 @@ THREE.Camera.prototype.clone = function (camera) {
 
 	camera.matrixWorldInverse.copy( this.matrixWorldInverse );
 	camera.projectionMatrix.copy( this.projectionMatrix );
+	camera.projectionMatrixInverse.copy( this.projectionMatrixInverse );
 
 	return camera;
 };
@@ -10333,7 +10243,7 @@ THREE.Loader.prototype = {
 
 	constructor: THREE.Loader,
 
-	crossOrigin: undefined,
+	crossOrigin: 'anonymous',
 
 	addStatusElement: function () {
 
@@ -10454,7 +10364,7 @@ THREE.Loader.prototype = {
 
 			};
 
-			if ( _this.crossOrigin !== undefined ) image.crossOrigin = _this.crossOrigin;
+			image.crossOrigin = _this.crossOrigin;
 			image.src = url;
 
 		}
@@ -10721,15 +10631,15 @@ THREE.Loader.prototype = {
 
 			// for the moment don't handle displacement texture
 
-			uniforms[ "diffuse" ].value.setHex( mpars.color );
-			uniforms[ "specular" ].value.setHex( mpars.specular );
-			uniforms[ "ambient" ].value.setHex( mpars.ambient );
+			uniforms[ "uDiffuseColor" ].value.setHex( mpars.color );
+			uniforms[ "uSpecularColor" ].value.setHex( mpars.specular );
+			uniforms[ "uAmbientColor" ].value.setHex( mpars.ambient );
 
-			uniforms[ "shininess" ].value = mpars.shininess;
+			uniforms[ "uShininess" ].value = mpars.shininess;
 
 			if ( mpars.opacity !== undefined ) {
 
-				uniforms[ "opacity" ].value = mpars.opacity;
+				uniforms[ "uOpacity" ].value = mpars.opacity;
 
 			}
 
@@ -13118,7 +13028,7 @@ THREE.SceneLoader.prototype = {
 
 					uniforms[ "tCube" ].value = matJSON.parameters.envMap;
 					uniforms[ "enableReflection" ].value = true;
-					uniforms[ "reflectivity" ].value = matJSON.parameters.reflectivity;
+					uniforms[ "uReflectivity" ].value = matJSON.parameters.reflectivity;
 
 				}
 
@@ -13146,15 +13056,15 @@ THREE.SceneLoader.prototype = {
 
 				}
 
-				uniforms[ "diffuse" ].value.setHex( diffuse );
-				uniforms[ "specular" ].value.setHex( specular );
-				uniforms[ "ambient" ].value.setHex( ambient );
+				uniforms[ "uDiffuseColor" ].value.setHex( diffuse );
+				uniforms[ "uSpecularColor" ].value.setHex( specular );
+				uniforms[ "uAmbientColor" ].value.setHex( ambient );
 
-				uniforms[ "shininess" ].value = shininess;
+				uniforms[ "uShininess" ].value = shininess;
 
 				if ( matJSON.parameters.opacity ) {
 
-					uniforms[ "opacity" ].value = matJSON.parameters.opacity;
+					uniforms[ "uOpacity" ].value = matJSON.parameters.opacity;
 
 				}
 
@@ -14247,6 +14157,9 @@ THREE.SpriteMaterial = function ( parameters ) {
 
 	this.fog = false;
 
+	this.uvOffset = new THREE.Vector2( 0, 0 );
+	this.uvScale  = new THREE.Vector2( 1, 1 );
+
 	// set parameters
 
 	this.setValues( parameters );
@@ -14265,6 +14178,9 @@ THREE.SpriteMaterial.prototype.clone = function () {
 	material.map = this.map;
 
 	material.rotation = this.rotation;
+
+	material.uvOffset.copy( this.uvOffset );
+	material.uvScale.copy( this.uvScale );
 
 	material.fog = this.fog;
 
@@ -14349,7 +14265,7 @@ THREE.Texture = function ( image, mapping, wrapS, wrapT, magFilter, minFilter, f
 	this.flipY = true;
 	this.unpackAlignment = 4; // valid values: 1, 2, 4, 8 (see http://www.khronos.org/opengles/sdk/docs/man/xhtml/glPixelStorei.xml)
 
-	this._needsUpdate = false;
+	this.needsUpdate = false;
 	this.onUpdate = null;
 
 };
@@ -14357,20 +14273,6 @@ THREE.Texture = function ( image, mapping, wrapS, wrapT, magFilter, minFilter, f
 THREE.Texture.prototype = {
 
 	constructor: THREE.Texture,
-
-	get needsUpdate () {
-
-		return this._needsUpdate;
-
-	},
-
-	set needsUpdate ( value ) {
-
-		if ( value === true ) this.update();
-
-		this._needsUpdate = value;
-
-	},
 
 	clone: function ( texture ) {
 
@@ -14401,12 +14303,6 @@ THREE.Texture.prototype = {
 		texture.unpackAlignment = this.unpackAlignment;
 
 		return texture;
-
-	},
-
-	update: function () {
-
-		this.dispatchEvent( { type: 'update' } );
 
 	},
 
@@ -15320,9 +15216,6 @@ THREE.Scene.prototype.__addObject = function ( object ) {
 
 	}
 
-	this.dispatchEvent( { type: 'objectAdded', object: object } );
-	object.dispatchEvent( { type: 'addedToScene', scene: this } );
-
 	for ( var c = 0; c < object.children.length; c ++ ) {
 
 		this.__addObject( object.children[ c ] );
@@ -15368,9 +15261,6 @@ THREE.Scene.prototype.__removeObject = function ( object ) {
 		}
 
 	}
-
-	this.dispatchEvent( { type: 'objectRemoved', object: object } );
-	object.dispatchEvent( { type: 'removedFromScene', scene: this } );
 
 	for ( var c = 0; c < object.children.length; c ++ ) {
 
@@ -15498,7 +15388,7 @@ THREE.CanvasRenderer = function ( parameters ) {
 
 	_lightColor = new THREE.Color(),
 
-	_patterns = {},
+	_patterns = {}, _imagedatas = {},
 
 	_near, _far,
 
@@ -15912,63 +15802,25 @@ THREE.CanvasRenderer = function ( parameters ) {
 		if ( material instanceof THREE.SpriteMaterial ||
 			 material instanceof THREE.ParticleSystemMaterial ) { // Backwards compatibility
 
-			var texture = material.map;
+			if ( material.map !== null ) {
 
-			if ( texture !== null ) {
-
-				if ( texture.hasEventListener( 'update', onTextureUpdate ) === false ) {
-
-					if ( texture.image !== undefined && texture.image.width > 0 ) {
-
-						textureToPattern( texture );
-
-					}
-
-					texture.addEventListener( 'update', onTextureUpdate );
-
-				}
-
-				var pattern = _patterns[ texture.id ];
-
-				if ( pattern !== undefined ) {
-
-					setFillStyle( pattern );
-
-				} else {
-
-					setFillStyle( 'rgba( 0, 0, 0, 1 )' );
-
-				}
-
-				//
-
-				var bitmap = texture.image;
-
-				var ox = bitmap.width * texture.offset.x;
-				var oy = bitmap.height * texture.offset.y;
-
-				var sx = bitmap.width * texture.repeat.x;
-				var sy = bitmap.height * texture.repeat.y;
-
-				var cx = scaleX / sx;
-				var cy = scaleY / sy;
+				var bitmap = material.map.image;
 
 				_context.save();
 				_context.translate( v1.x, v1.y );
-				if ( material.rotation !== 0 ) _context.rotate( material.rotation );
-				_context.translate( - scaleX / 2, - scaleY / 2 );
-				_context.scale( cx, cy );
-				_context.translate( - ox, - oy );
-				_context.fillRect( ox, oy, sx, sy );
+				_context.rotate( material.rotation );
+				_context.scale( scaleX, - scaleY );
+
+				_context.drawImage( bitmap, 0, 0, bitmap.width, bitmap.height, - 0.5, - 0.5, 1, 1 );
 				_context.restore();
 
-			} else { // no texture
+			} else {
 
 				setFillStyle( material.color.getStyle() );
 
 				_context.save();
 				_context.translate( v1.x, v1.y );
-				if ( material.rotation !== 0 ) _context.rotate( material.rotation );
+				_context.rotate( material.rotation );
 				_context.scale( scaleX, - scaleY );
 				_context.fillRect( - 0.5, - 0.5, 1, 1 );
 				_context.restore();
@@ -15982,7 +15834,7 @@ THREE.CanvasRenderer = function ( parameters ) {
 
 			_context.save();
 			_context.translate( v1.x, v1.y );
-			if ( material.rotation !== 0 ) _context.rotate( material.rotation );
+			_context.rotate( - element.rotation );
 			_context.scale( scaleX, scaleY );
 
 			material.program( _context );
@@ -16271,69 +16123,32 @@ THREE.CanvasRenderer = function ( parameters ) {
 
 	}
 
-	function onTextureUpdate ( event ) {
-
-		textureToPattern( event.target );
-
-	}
-
-	function textureToPattern( texture ) {
-
-		var repeatX = texture.wrapS === THREE.RepeatWrapping;
-		var repeatY = texture.wrapT === THREE.RepeatWrapping;
-
-		var image = texture.image;
-
-		var canvas = document.createElement( 'canvas' );
-		canvas.width = image.width;
-		canvas.height = image.height;
-
-		var context = canvas.getContext( '2d' );
-		context.setTransform( 1, 0, 0, - 1, 0, image.height );
-		context.drawImage( image, 0, 0 );
-
-		_patterns[ texture.id ] = _context.createPattern(
-			canvas, repeatX === true && repeatY === true
-				? 'repeat'
-				: repeatX === true && repeatY === false
-					? 'repeat-x'
-					: repeatX === false && repeatY === true
-						? 'repeat-y'
-						: 'no-repeat'
-		);
-
-	}
-
 	function patternPath( x0, y0, x1, y1, x2, y2, u0, v0, u1, v1, u2, v2, texture ) {
 
-		if ( texture instanceof THREE.DataTexture ) return;
+		if ( texture instanceof THREE.DataTexture || texture.image === undefined || texture.image.width === 0 ) return;
 
-		if ( texture.hasEventListener( 'update', onTextureUpdate ) === false ) {
+		if ( texture.needsUpdate === true ) {
 
-			if ( texture.image !== undefined && texture.image.width > 0 ) {
+			var repeatX = texture.wrapS === THREE.RepeatWrapping;
+			var repeatY = texture.wrapT === THREE.RepeatWrapping;
 
-				textureToPattern( texture );
+			_patterns[ texture.id ] = _context.createPattern(
+				texture.image, repeatX === true && repeatY === true
+					? 'repeat'
+					: repeatX === true && repeatY === false
+						? 'repeat-x'
+						: repeatX === false && repeatY === true
+							? 'repeat-y'
+							: 'no-repeat'
+			);
 
-			}
-
-			texture.addEventListener( 'update', onTextureUpdate );
+			texture.needsUpdate = false;
 
 		}
 
-		var pattern = _patterns[ texture.id ];
-
-		if ( pattern !== undefined ) {
-
-			setFillStyle( pattern );
-
-		} else {
-
-			setFillStyle( 'rgba(0,0,0,1)' );
-			_context.fill();
-
-			return;
-
-		}	
+		_patterns[ texture.id ] === undefined
+			? setFillStyle( 'rgba(0,0,0,1)' )
+			: setFillStyle( _patterns[ texture.id ] );
 
 		// http://extremelysatisfactorytotalitarianism.com/blog/?p=2120
 
@@ -16344,13 +16159,13 @@ THREE.CanvasRenderer = function ( parameters ) {
 		height = texture.image.height * texture.repeat.y;
 
 		u0 = ( u0 + offsetX ) * width;
-		v0 = ( v0 + offsetY ) * height;
+		v0 = ( 1.0 - v0 + offsetY ) * height;
 
 		u1 = ( u1 + offsetX ) * width;
-		v1 = ( v1 + offsetY ) * height;
+		v1 = ( 1.0 - v1 + offsetY ) * height;
 
 		u2 = ( u2 + offsetX ) * width;
-		v2 = ( v2 + offsetY ) * height;
+		v2 = ( 1.0 - v2 + offsetY ) * height;
 
 		x1 -= x0; y1 -= y0;
 		x2 -= x0; y2 -= y0;
@@ -16360,7 +16175,30 @@ THREE.CanvasRenderer = function ( parameters ) {
 
 		det = u1 * v2 - u2 * v1;
 
-		if ( det === 0 ) return;
+		if ( det === 0 ) {
+
+			if ( _imagedatas[ texture.id ] === undefined ) {
+
+				var canvas = document.createElement( 'canvas' )
+				canvas.width = texture.image.width;
+				canvas.height = texture.image.height;
+
+				var context = canvas.getContext( '2d' );
+				context.drawImage( texture.image, 0, 0 );
+
+				_imagedatas[ texture.id ] = context.getImageData( 0, 0, texture.image.width, texture.image.height ).data;
+
+			}
+
+			var data = _imagedatas[ texture.id ];
+			var index = ( Math.floor( u0 ) + Math.floor( v0 ) * texture.image.width ) * 4;
+
+			_color.setRGB( data[ index ] / 255, data[ index + 1 ] / 255, data[ index + 2 ] / 255 );
+			fillPath( _color );
+
+			return;
+
+		}
 
 		idet = 1 / det;
 
@@ -17497,12 +17335,20 @@ THREE.ShaderChunk = {
 				"float pointDotNormalHalf = max( dot( normal, pointHalfVector ), 0.0 );",
 				"float pointSpecularWeight = specularStrength * max( pow( pointDotNormalHalf, shininess ), 0.0 );",
 
-				// 2.0 => 2.0001 is hack to work around ANGLE bug
+				"#ifdef PHYSICALLY_BASED_SHADING",
 
-				"float specularNormalization = ( shininess + 2.0001 ) / 8.0;",
+					// 2.0 => 2.0001 is hack to work around ANGLE bug
 
-				"vec3 schlick = specular + vec3( 1.0 - specular ) * pow( 1.0 - dot( lVector, pointHalfVector ), 5.0 );",
-				"pointSpecular += schlick * pointLightColor[ i ] * pointSpecularWeight * pointDiffuseWeight * lDistance * specularNormalization;",
+					"float specularNormalization = ( shininess + 2.0001 ) / 8.0;",
+
+					"vec3 schlick = specular + vec3( 1.0 - specular ) * pow( 1.0 - dot( lVector, pointHalfVector ), 5.0 );",
+					"pointSpecular += schlick * pointLightColor[ i ] * pointSpecularWeight * pointDiffuseWeight * lDistance * specularNormalization;",
+
+				"#else",
+
+					"pointSpecular += specular * pointLightColor[ i ] * pointSpecularWeight * pointDiffuseWeight * lDistance;",
+
+				"#endif",
 
 			"}",
 
@@ -17564,12 +17410,20 @@ THREE.ShaderChunk = {
 					"float spotDotNormalHalf = max( dot( normal, spotHalfVector ), 0.0 );",
 					"float spotSpecularWeight = specularStrength * max( pow( spotDotNormalHalf, shininess ), 0.0 );",
 
-					// 2.0 => 2.0001 is hack to work around ANGLE bug
+					"#ifdef PHYSICALLY_BASED_SHADING",
 
-					"float specularNormalization = ( shininess + 2.0001 ) / 8.0;",
+						// 2.0 => 2.0001 is hack to work around ANGLE bug
 
-					"vec3 schlick = specular + vec3( 1.0 - specular ) * pow( 1.0 - dot( lVector, spotHalfVector ), 5.0 );",
-					"spotSpecular += schlick * spotLightColor[ i ] * spotSpecularWeight * spotDiffuseWeight * lDistance * specularNormalization * spotEffect;",
+						"float specularNormalization = ( shininess + 2.0001 ) / 8.0;",
+
+						"vec3 schlick = specular + vec3( 1.0 - specular ) * pow( 1.0 - dot( lVector, spotHalfVector ), 5.0 );",
+						"spotSpecular += schlick * spotLightColor[ i ] * spotSpecularWeight * spotDiffuseWeight * lDistance * specularNormalization * spotEffect;",
+
+					"#else",
+
+						"spotSpecular += specular * spotLightColor[ i ] * spotSpecularWeight * spotDiffuseWeight * lDistance * spotEffect;",
+
+					"#endif",
 
 				"}",
 
@@ -17612,34 +17466,41 @@ THREE.ShaderChunk = {
 				"float dirDotNormalHalf = max( dot( normal, dirHalfVector ), 0.0 );",
 				"float dirSpecularWeight = specularStrength * max( pow( dirDotNormalHalf, shininess ), 0.0 );",
 
+				"#ifdef PHYSICALLY_BASED_SHADING",
+
 					/*
-				// fresnel term from skin shader
-				"const float F0 = 0.128;",
+					// fresnel term from skin shader
+					"const float F0 = 0.128;",
 
-				"float base = 1.0 - dot( viewPosition, dirHalfVector );",
-				"float exponential = pow( base, 5.0 );",
+					"float base = 1.0 - dot( viewPosition, dirHalfVector );",
+					"float exponential = pow( base, 5.0 );",
 
-				"float fresnel = exponential + F0 * ( 1.0 - exponential );",
-				*/
+					"float fresnel = exponential + F0 * ( 1.0 - exponential );",
+					*/
 
-				/*
-				// fresnel term from fresnel shader
-				"const float mFresnelBias = 0.08;",
-				"const float mFresnelScale = 0.3;",
-				"const float mFresnelPower = 5.0;",
+					/*
+					// fresnel term from fresnel shader
+					"const float mFresnelBias = 0.08;",
+					"const float mFresnelScale = 0.3;",
+					"const float mFresnelPower = 5.0;",
 
-				"float fresnel = mFresnelBias + mFresnelScale * pow( 1.0 + dot( normalize( -viewPosition ), normal ), mFresnelPower );",
-				*/
+					"float fresnel = mFresnelBias + mFresnelScale * pow( 1.0 + dot( normalize( -viewPosition ), normal ), mFresnelPower );",
+					*/
 
-				// 2.0 => 2.0001 is hack to work around ANGLE bug
+					// 2.0 => 2.0001 is hack to work around ANGLE bug
 
-				"float specularNormalization = ( shininess + 2.0001 ) / 8.0;",
+					"float specularNormalization = ( shininess + 2.0001 ) / 8.0;",
 
-				//"dirSpecular += specular * directionalLightColor[ i ] * dirSpecularWeight * dirDiffuseWeight * specularNormalization * fresnel;",
+					//"dirSpecular += specular * directionalLightColor[ i ] * dirSpecularWeight * dirDiffuseWeight * specularNormalization * fresnel;",
 
-				"vec3 schlick = specular + vec3( 1.0 - specular ) * pow( 1.0 - dot( dirVector, dirHalfVector ), 5.0 );",
-				"dirSpecular += schlick * directionalLightColor[ i ] * dirSpecularWeight * dirDiffuseWeight * specularNormalization;",
+					"vec3 schlick = specular + vec3( 1.0 - specular ) * pow( 1.0 - dot( dirVector, dirHalfVector ), 5.0 );",
+					"dirSpecular += schlick * directionalLightColor[ i ] * dirSpecularWeight * dirDiffuseWeight * specularNormalization;",
 
+				"#else",
+
+					"dirSpecular += specular * directionalLightColor[ i ] * dirSpecularWeight * dirDiffuseWeight;",
+
+				"#endif",
 
 			"}",
 
@@ -17678,15 +17539,23 @@ THREE.ShaderChunk = {
 				"float hemiDotNormalHalfGround = 0.5 * dot( normal, hemiHalfVectorGround ) + 0.5;",
 				"float hemiSpecularWeightGround = specularStrength * max( pow( hemiDotNormalHalfGround, shininess ), 0.0 );",
 
-				"float dotProductGround = dot( normal, lVectorGround );",
+				"#ifdef PHYSICALLY_BASED_SHADING",
 
-				// 2.0 => 2.0001 is hack to work around ANGLE bug
+					"float dotProductGround = dot( normal, lVectorGround );",
 
-				"float specularNormalization = ( shininess + 2.0001 ) / 8.0;",
+					// 2.0 => 2.0001 is hack to work around ANGLE bug
 
-				"vec3 schlickSky = specular + vec3( 1.0 - specular ) * pow( 1.0 - dot( lVector, hemiHalfVectorSky ), 5.0 );",
-				"vec3 schlickGround = specular + vec3( 1.0 - specular ) * pow( 1.0 - dot( lVectorGround, hemiHalfVectorGround ), 5.0 );",
-				"hemiSpecular += hemiColor * specularNormalization * ( schlickSky * hemiSpecularWeightSky * max( dotProduct, 0.0 ) + schlickGround * hemiSpecularWeightGround * max( dotProductGround, 0.0 ) );",
+					"float specularNormalization = ( shininess + 2.0001 ) / 8.0;",
+
+					"vec3 schlickSky = specular + vec3( 1.0 - specular ) * pow( 1.0 - dot( lVector, hemiHalfVectorSky ), 5.0 );",
+					"vec3 schlickGround = specular + vec3( 1.0 - specular ) * pow( 1.0 - dot( lVectorGround, hemiHalfVectorGround ), 5.0 );",
+					"hemiSpecular += hemiColor * specularNormalization * ( schlickSky * hemiSpecularWeightSky * max( dotProduct, 0.0 ) + schlickGround * hemiSpecularWeightGround * max( dotProductGround, 0.0 ) );",
+
+				"#else",
+
+					"hemiSpecular += specular * hemiColor * ( hemiSpecularWeightSky + hemiSpecularWeightGround ) * hemiDiffuseWeight;",
+
+				"#endif",
 
 			"}",
 
@@ -19056,15 +18925,15 @@ THREE.ShaderLib = {
 			"uDisplacementBias": { type: "f", value: 0.0 },
 			"uDisplacementScale": { type: "f", value: 1.0 },
 
-			"diffuse": { type: "c", value: new THREE.Color( 0xffffff ) },
-			"specular": { type: "c", value: new THREE.Color( 0x111111 ) },
-			"ambient": { type: "c", value: new THREE.Color( 0xffffff ) },
-			"shininess": { type: "f", value: 30 },
-			"opacity": { type: "f", value: 1 },
+			"uDiffuseColor": { type: "c", value: new THREE.Color( 0xffffff ) },
+			"uSpecularColor": { type: "c", value: new THREE.Color( 0x111111 ) },
+			"uAmbientColor": { type: "c", value: new THREE.Color( 0xffffff ) },
+			"uShininess": { type: "f", value: 30 },
+			"uOpacity": { type: "f", value: 1 },
 
 			"useRefract": { type: "i", value: 0 },
-			"refractionRatio": { type: "f", value: 0.98 },
-			"reflectivity": { type: "f", value: 0.5 },
+			"uRefractionRatio": { type: "f", value: 0.98 },
+			"uReflectivity": { type: "f", value: 0.5 },
 
 			"uOffset" : { type: "v2", value: new THREE.Vector2( 0, 0 ) },
 			"uRepeat" : { type: "v2", value: new THREE.Vector2( 1, 1 ) },
@@ -19077,11 +18946,11 @@ THREE.ShaderLib = {
 
 		fragmentShader: [
 
-			"uniform vec3 ambient;",
-			"uniform vec3 diffuse;",
-			"uniform vec3 specular;",
-			"uniform float shininess;",
-			"uniform float opacity;",
+			"uniform vec3 uAmbientColor;",
+			"uniform vec3 uDiffuseColor;",
+			"uniform vec3 uSpecularColor;",
+			"uniform float uShininess;",
+			"uniform float uOpacity;",
 
 			"uniform bool enableDiffuse;",
 			"uniform bool enableSpecular;",
@@ -19098,8 +18967,8 @@ THREE.ShaderLib = {
 			"uniform vec2 uNormalScale;",
 
 			"uniform bool useRefract;",
-			"uniform float refractionRatio;",
-			"uniform float reflectivity;",
+			"uniform float uRefractionRatio;",
+			"uniform float uReflectivity;",
 
 			"varying vec3 vTangent;",
 			"varying vec3 vBinormal;",
@@ -19156,7 +19025,7 @@ THREE.ShaderLib = {
 
 			"void main() {",
 
-				"gl_FragColor = vec4( vec3( 1.0 ), opacity );",
+				"gl_FragColor = vec4( vec3( 1.0 ), uOpacity );",
 
 				"vec3 specularTex = vec3( 1.0 );",
 
@@ -19246,20 +19115,28 @@ THREE.ShaderLib = {
 
 						"#endif",
 
-						"pointDiffuse += pointDistance * pointLightColor[ i ] * diffuse * pointDiffuseWeight;",
+						"pointDiffuse += pointDistance * pointLightColor[ i ] * uDiffuseColor * pointDiffuseWeight;",
 
 						// specular
 
 						"vec3 pointHalfVector = normalize( pointVector + viewPosition );",
 						"float pointDotNormalHalf = max( dot( normal, pointHalfVector ), 0.0 );",
-						"float pointSpecularWeight = specularTex.r * max( pow( pointDotNormalHalf, shininess ), 0.0 );",
+						"float pointSpecularWeight = specularTex.r * max( pow( pointDotNormalHalf, uShininess ), 0.0 );",
 
-						// 2.0 => 2.0001 is hack to work around ANGLE bug
+						"#ifdef PHYSICALLY_BASED_SHADING",
 
-						"float specularNormalization = ( shininess + 2.0001 ) / 8.0;",
+							// 2.0 => 2.0001 is hack to work around ANGLE bug
 
-						"vec3 schlick = specular + vec3( 1.0 - specular ) * pow( 1.0 - dot( pointVector, pointHalfVector ), 5.0 );",
-						"pointSpecular += schlick * pointLightColor[ i ] * pointSpecularWeight * pointDiffuseWeight * pointDistance * specularNormalization;",
+							"float specularNormalization = ( uShininess + 2.0001 ) / 8.0;",
+
+							"vec3 schlick = uSpecularColor + vec3( 1.0 - uSpecularColor ) * pow( 1.0 - dot( pointVector, pointHalfVector ), 5.0 );",
+							"pointSpecular += schlick * pointLightColor[ i ] * pointSpecularWeight * pointDiffuseWeight * pointDistance * specularNormalization;",
+
+						"#else",
+
+							"pointSpecular += pointDistance * pointLightColor[ i ] * uSpecularColor * pointSpecularWeight * pointDiffuseWeight;",
+
+						"#endif",
 
 					"}",
 
@@ -19304,20 +19181,28 @@ THREE.ShaderLib = {
 
 							"#endif",
 
-							"spotDiffuse += spotDistance * spotLightColor[ i ] * diffuse * spotDiffuseWeight * spotEffect;",
+							"spotDiffuse += spotDistance * spotLightColor[ i ] * uDiffuseColor * spotDiffuseWeight * spotEffect;",
 
 							// specular
 
 							"vec3 spotHalfVector = normalize( spotVector + viewPosition );",
 							"float spotDotNormalHalf = max( dot( normal, spotHalfVector ), 0.0 );",
-							"float spotSpecularWeight = specularTex.r * max( pow( spotDotNormalHalf, shininess ), 0.0 );",
+							"float spotSpecularWeight = specularTex.r * max( pow( spotDotNormalHalf, uShininess ), 0.0 );",
 
-							// 2.0 => 2.0001 is hack to work around ANGLE bug
+							"#ifdef PHYSICALLY_BASED_SHADING",
 
-							"float specularNormalization = ( shininess + 2.0001 ) / 8.0;",
+								// 2.0 => 2.0001 is hack to work around ANGLE bug
 
-							"vec3 schlick = specular + vec3( 1.0 - specular ) * pow( 1.0 - dot( spotVector, spotHalfVector ), 5.0 );",
-							"spotSpecular += schlick * spotLightColor[ i ] * spotSpecularWeight * spotDiffuseWeight * spotDistance * specularNormalization * spotEffect;",
+								"float specularNormalization = ( uShininess + 2.0001 ) / 8.0;",
+
+								"vec3 schlick = uSpecularColor + vec3( 1.0 - uSpecularColor ) * pow( 1.0 - dot( spotVector, spotHalfVector ), 5.0 );",
+								"spotSpecular += schlick * spotLightColor[ i ] * spotSpecularWeight * spotDiffuseWeight * spotDistance * specularNormalization * spotEffect;",
+
+							"#else",
+
+								"spotSpecular += spotDistance * spotLightColor[ i ] * uSpecularColor * spotSpecularWeight * spotDiffuseWeight * spotEffect;",
+
+							"#endif",
 
 						"}",
 
@@ -19352,20 +19237,28 @@ THREE.ShaderLib = {
 
 						"#endif",
 
-						"dirDiffuse += directionalLightColor[ i ] * diffuse * dirDiffuseWeight;",
+						"dirDiffuse += directionalLightColor[ i ] * uDiffuseColor * dirDiffuseWeight;",
 
 						// specular
 
 						"vec3 dirHalfVector = normalize( dirVector + viewPosition );",
 						"float dirDotNormalHalf = max( dot( normal, dirHalfVector ), 0.0 );",
-						"float dirSpecularWeight = specularTex.r * max( pow( dirDotNormalHalf, shininess ), 0.0 );",
+						"float dirSpecularWeight = specularTex.r * max( pow( dirDotNormalHalf, uShininess ), 0.0 );",
 
-						// 2.0 => 2.0001 is hack to work around ANGLE bug
+						"#ifdef PHYSICALLY_BASED_SHADING",
 
-						"float specularNormalization = ( shininess + 2.0001 ) / 8.0;",
+							// 2.0 => 2.0001 is hack to work around ANGLE bug
 
-						"vec3 schlick = specular + vec3( 1.0 - specular ) * pow( 1.0 - dot( dirVector, dirHalfVector ), 5.0 );",
-						"dirSpecular += schlick * directionalLightColor[ i ] * dirSpecularWeight * dirDiffuseWeight * specularNormalization;",
+							"float specularNormalization = ( uShininess + 2.0001 ) / 8.0;",
+
+							"vec3 schlick = uSpecularColor + vec3( 1.0 - uSpecularColor ) * pow( 1.0 - dot( dirVector, dirHalfVector ), 5.0 );",
+							"dirSpecular += schlick * directionalLightColor[ i ] * dirSpecularWeight * dirDiffuseWeight * specularNormalization;",
+
+						"#else",
+
+							"dirSpecular += directionalLightColor[ i ] * uSpecularColor * dirSpecularWeight * dirDiffuseWeight;",
+
+						"#endif",
 
 					"}",
 
@@ -19390,14 +19283,14 @@ THREE.ShaderLib = {
 
 						"vec3 hemiColor = mix( hemisphereLightGroundColor[ i ], hemisphereLightSkyColor[ i ], hemiDiffuseWeight );",
 
-						"hemiDiffuse += diffuse * hemiColor;",
+						"hemiDiffuse += uDiffuseColor * hemiColor;",
 
 						// specular (sky light)
 
 
 						"vec3 hemiHalfVectorSky = normalize( lVector + viewPosition );",
 						"float hemiDotNormalHalfSky = 0.5 * dot( normal, hemiHalfVectorSky ) + 0.5;",
-						"float hemiSpecularWeightSky = specularTex.r * max( pow( hemiDotNormalHalfSky, shininess ), 0.0 );",
+						"float hemiSpecularWeightSky = specularTex.r * max( pow( hemiDotNormalHalfSky, uShininess ), 0.0 );",
 
 						// specular (ground light)
 
@@ -19405,17 +19298,25 @@ THREE.ShaderLib = {
 
 						"vec3 hemiHalfVectorGround = normalize( lVectorGround + viewPosition );",
 						"float hemiDotNormalHalfGround = 0.5 * dot( normal, hemiHalfVectorGround ) + 0.5;",
-						"float hemiSpecularWeightGround = specularTex.r * max( pow( hemiDotNormalHalfGround, shininess ), 0.0 );",
+						"float hemiSpecularWeightGround = specularTex.r * max( pow( hemiDotNormalHalfGround, uShininess ), 0.0 );",
 
-						"float dotProductGround = dot( normal, lVectorGround );",
+						"#ifdef PHYSICALLY_BASED_SHADING",
 
-						// 2.0 => 2.0001 is hack to work around ANGLE bug
+							"float dotProductGround = dot( normal, lVectorGround );",
 
-						"float specularNormalization = ( shininess + 2.0001 ) / 8.0;",
+							// 2.0 => 2.0001 is hack to work around ANGLE bug
 
-						"vec3 schlickSky = specular + vec3( 1.0 - specular ) * pow( 1.0 - dot( lVector, hemiHalfVectorSky ), 5.0 );",
-						"vec3 schlickGround = specular + vec3( 1.0 - specular ) * pow( 1.0 - dot( lVectorGround, hemiHalfVectorGround ), 5.0 );",
-						"hemiSpecular += hemiColor * specularNormalization * ( schlickSky * hemiSpecularWeightSky * max( dotProduct, 0.0 ) + schlickGround * hemiSpecularWeightGround * max( dotProductGround, 0.0 ) );",
+							"float specularNormalization = ( uShininess + 2.0001 ) / 8.0;",
+
+							"vec3 schlickSky = uSpecularColor + vec3( 1.0 - uSpecularColor ) * pow( 1.0 - dot( lVector, hemiHalfVectorSky ), 5.0 );",
+							"vec3 schlickGround = uSpecularColor + vec3( 1.0 - uSpecularColor ) * pow( 1.0 - dot( lVectorGround, hemiHalfVectorGround ), 5.0 );",
+							"hemiSpecular += hemiColor * specularNormalization * ( schlickSky * hemiSpecularWeightSky * max( dotProduct, 0.0 ) + schlickGround * hemiSpecularWeightGround * max( dotProductGround, 0.0 ) );",
+
+						"#else",
+
+							"hemiSpecular += uSpecularColor * hemiColor * ( hemiSpecularWeightSky + hemiSpecularWeightGround ) * hemiDiffuseWeight;",
+
+						"#endif",
 
 					"}",
 
@@ -19456,11 +19357,11 @@ THREE.ShaderLib = {
 
 				"#ifdef METAL",
 
-					"gl_FragColor.xyz = gl_FragColor.xyz * ( totalDiffuse + ambientLightColor * ambient + totalSpecular );",
+					"gl_FragColor.xyz = gl_FragColor.xyz * ( totalDiffuse + ambientLightColor * uAmbientColor + totalSpecular );",
 
 				"#else",
 
-					"gl_FragColor.xyz = gl_FragColor.xyz * ( totalDiffuse + ambientLightColor * ambient ) + totalSpecular;",
+					"gl_FragColor.xyz = gl_FragColor.xyz * ( totalDiffuse + ambientLightColor * uAmbientColor ) + totalSpecular;",
 
 				"#endif",
 
@@ -19471,7 +19372,7 @@ THREE.ShaderLib = {
 
 					"if ( useRefract ) {",
 
-						"vReflect = refract( cameraToVertex, normal, refractionRatio );",
+						"vReflect = refract( cameraToVertex, normal, uRefractionRatio );",
 
 					"} else {",
 
@@ -19487,7 +19388,7 @@ THREE.ShaderLib = {
 
 					"#endif",
 
-					"gl_FragColor.xyz = mix( gl_FragColor.xyz, cubeColor.xyz, specularTex.r * reflectivity );",
+					"gl_FragColor.xyz = mix( gl_FragColor.xyz, cubeColor.xyz, specularTex.r * uReflectivity );",
 
 				"}",
 
@@ -19782,6 +19683,7 @@ THREE.WebGLRenderer = function ( parameters ) {
 
 	this.gammaInput = false;
 	this.gammaOutput = false;
+	this.physicallyBasedShading = false;
 
 	// shadow map
 
@@ -22440,16 +22342,16 @@ THREE.WebGLRenderer = function ( parameters ) {
 
 				}
 
+				var position = geometryAttributes[ "position" ];
+
+				// render particles
+
+				_gl.drawArrays( _gl.POINTS, 0, position.numItems / 3 );
+
+				_this.info.render.calls ++;
+				_this.info.render.points += position.numItems / 3;
+
 			}
-
-			var position = geometryAttributes[ "position" ];
-
-			// render particles
-
-			_gl.drawArrays( _gl.POINTS, 0, position.numItems / 3 );
-
-			_this.info.render.calls ++;
-			_this.info.render.points += position.numItems / 3;
 
 		} else if ( object instanceof THREE.Line ) {
 
@@ -22487,22 +22389,22 @@ THREE.WebGLRenderer = function ( parameters ) {
 
 				}
 
+				// render lines
+
+				var primitives = ( object.type === THREE.LineStrip ) ? _gl.LINE_STRIP : _gl.LINES;
+
+				setLineWidth( material.linewidth );
+
+				var position = geometryAttributes[ "position" ];
+
+				_gl.drawArrays( primitives, 0, position.numItems / 3 );
+
+				_this.info.render.calls ++;
+				_this.info.render.points += position.numItems;
+
 			}
 
-			// render lines
-
-			var primitives = ( object.type === THREE.LineStrip ) ? _gl.LINE_STRIP : _gl.LINES;
-
-			setLineWidth( material.linewidth );
-
-			var position = geometryAttributes[ "position" ];
-
-			_gl.drawArrays( primitives, 0, position.numItems / 3 );
-
-			_this.info.render.calls ++;
-			_this.info.render.points += position.numItems;
-
-		}
+    	}
 
 	};
 
@@ -25238,6 +25140,7 @@ THREE.WebGLRenderer = function ( parameters ) {
 
 			_this.gammaInput ? "#define GAMMA_INPUT" : "",
 			_this.gammaOutput ? "#define GAMMA_OUTPUT" : "",
+			_this.physicallyBasedShading ? "#define PHYSICALLY_BASED_SHADING" : "",
 
 			"#define MAX_DIR_LIGHTS " + parameters.maxDirLights,
 			"#define MAX_POINT_LIGHTS " + parameters.maxPointLights,
@@ -25347,6 +25250,7 @@ THREE.WebGLRenderer = function ( parameters ) {
 
 			_this.gammaInput ? "#define GAMMA_INPUT" : "",
 			_this.gammaOutput ? "#define GAMMA_OUTPUT" : "",
+			_this.physicallyBasedShading ? "#define PHYSICALLY_BASED_SHADING" : "",
 
 			( parameters.useFog && parameters.fog ) ? "#define USE_FOG" : "",
 			( parameters.useFog && parameters.fogExp ) ? "#define FOG_EXP2" : "",
@@ -26399,7 +26303,6 @@ THREE.WebGLRenderTargetCube.prototype = Object.create( THREE.WebGLRenderTarget.p
 
 THREE.RenderableVertex = function () {
 
-	this.position = new THREE.Vector3();
 	this.positionWorld = new THREE.Vector3();
 	this.positionScreen = new THREE.Vector4();
 
@@ -26860,7 +26763,7 @@ THREE.GeometryUtils = {
 
 THREE.ImageUtils = {
 
-	crossOrigin: undefined,
+	crossOrigin: 'anonymous',
 
 	loadTexture: function ( url, mapping, onLoad, onError ) {
 
@@ -31388,7 +31291,7 @@ THREE.CubeCamera = function ( near, far, cubeResolution ) {
 
 THREE.CubeCamera.prototype = Object.create( THREE.Object3D.prototype );
 
-/**
+/*
  *	@author zz85 / http://twitter.com/blurspline / http://www.lab4games.net/zz85/blog
  *
  *	A general perpose camera, for setting FOV, Lens Focal Length,
@@ -31624,6 +31527,7 @@ THREE.CombinedCamera.prototype.toBottomView = function() {
 	this.rotationAutoUpdate = false;
 
 };
+
 
 /**
  * @author hughes
@@ -33285,7 +33189,6 @@ THREE.TorusGeometry = function ( radius, tube, radialSegments, tubularSegments, 
 			normals.push( vertex.clone().sub( center ).normalize() );
 
 		}
-
 	}
 
 
@@ -33298,20 +33201,30 @@ THREE.TorusGeometry = function ( radius, tube, radialSegments, tubularSegments, 
 			var c = ( this.tubularSegments + 1 ) * ( j - 1 ) + i;
 			var d = ( this.tubularSegments + 1 ) * j + i;
 
-			var face = new THREE.Face3( a, b, d, [ normals[ a ].clone(), normals[ b ].clone(), normals[ d ].clone() ] );
+			var face = new THREE.Face3( a, b, d, [ normals[ a ], normals[ b ], normals[ d ] ] );
+			face.normal.add( normals[ a ] );
+			face.normal.add( normals[ b ] );
+			face.normal.add( normals[ d ] );
+			face.normal.normalize();
+
 			this.faces.push( face );
+
 			this.faceVertexUvs[ 0 ].push( [ uvs[ a ].clone(), uvs[ b ].clone(), uvs[ d ].clone() ] );
 
-			face = new THREE.Face3( b, c, d, [ normals[ b ].clone(), normals[ c ].clone(), normals[ d ].clone() ] );
-			this.faces.push( face );
-			this.faceVertexUvs[ 0 ].push( [ uvs[ b ].clone(), uvs[ c ].clone(), uvs[ d ].clone() ] );
+			face = new THREE.Face3( b, c, d, [ normals[ b ], normals[ c ], normals[ d ] ] );
+			face.normal.add( normals[ b ] );
+			face.normal.add( normals[ c ] );
+			face.normal.add( normals[ d ] );
+			face.normal.normalize();
 
+			this.faces.push( face );
+
+			this.faceVertexUvs[ 0 ].push( [ uvs[ b ].clone(), uvs[ c ].clone(), uvs[ d ].clone() ] );
 		}
 
 	}
 
 	this.computeCentroids();
-	this.computeFaceNormals();
 
 };
 
@@ -34297,7 +34210,7 @@ THREE.BoxHelper.prototype.update = function ( object ) {
 
 THREE.BoundingBoxHelper = function ( object, hex ) {
 
-	var color = ( hex !== undefined ) ? hex : 0x888888;
+	var color = hex || 0x888888;
 
 	this.object = object;
 
@@ -34578,91 +34491,6 @@ THREE.DirectionalLightHelper.prototype.update = function () {
 
 
 /**
- * @author WestLangley / http://github.com/WestLangley
- */
-
-THREE.EdgesHelper = function ( object, hex ) {
-
-	var color = ( hex !== undefined ) ? hex : 0xffffff;
-
-	var edge = [ 0, 0 ], hash = {};
-	var sortFunction = function ( a, b ) { return a - b };
-
-	var keys = [ 'a', 'b', 'c' ];
-	var geometry = new THREE.BufferGeometry();
-
-	var geometry2 = object.geometry.clone();
-
-	geometry2.mergeVertices();
-	geometry2.computeFaceNormals();
-
-	var vertices = geometry2.vertices;
-	var faces = geometry2.faces;
-	var numEdges = 0;
-
-	for ( var i = 0, l = faces.length; i < l; i ++ ) {
-
-		var face = faces[ i ];
-
-		for ( var j = 0; j < 3; j ++ ) {
-
-			edge[ 0 ] = face[ keys[ j ] ];
-			edge[ 1 ] = face[ keys[ ( j + 1 ) % 3 ] ];
-			edge.sort( sortFunction );
-
-			var key = edge.toString();
-
-			if ( hash[ key ] === undefined ) {
-
-				hash[ key ] = { vert1: edge[ 0 ], vert2: edge[ 1 ], face1: i, face2: undefined };
-				numEdges ++;
-
-			} else {
-
-				hash[ key ].face2 = i;
-
-			}
-
-		}
-
-	}
-
-	geometry.addAttribute( 'position', Float32Array, 2 * numEdges, 3 );
-
-	var coords = geometry.attributes.position.array;
-
-	var index = 0;
-
-	for ( var key in hash ) {
-
-		var h = hash[ key ];
-
-		if ( h.face2 === undefined || faces[ h.face1 ].normal.dot( faces[ h.face2 ].normal ) < 0.9999 ) { // hardwired const OK
-
-			var vertex = vertices[ h.vert1 ];
-			coords[ index ++ ] = vertex.x;
-			coords[ index ++ ] = vertex.y;
-			coords[ index ++ ] = vertex.z;
-
-			vertex = vertices[ h.vert2 ];
-			coords[ index ++ ] = vertex.x;
-			coords[ index ++ ] = vertex.y;
-			coords[ index ++ ] = vertex.z;
-
-		}
-
-	}
-
-	THREE.Line.call( this, geometry, new THREE.LineBasicMaterial( { color: color } ), THREE.LinePieces );
-
-	this.matrixAutoUpdate = false;
-	this.matrixWorld = object.matrixWorld;
-
-};
-
-THREE.EdgesHelper.prototype = Object.create( THREE.Line.prototype );
-
-/**
  * @author mrdoob / http://mrdoob.com/
  * @author WestLangley / http://github.com/WestLangley
 */
@@ -34671,11 +34499,11 @@ THREE.FaceNormalsHelper = function ( object, size, hex, linewidth ) {
 
 	this.object = object;
 
-	this.size = ( size !== undefined ) ? size : 1;
+	this.size = size || 1;
 
-	var color = ( hex !== undefined ) ? hex : 0xffff00;
+	var color = hex || 0xffff00;
 
-	var width = ( linewidth !== undefined ) ? linewidth : 1;
+	var width = linewidth || 1;
 
 	var geometry = new THREE.Geometry();
 
@@ -34980,11 +34808,11 @@ THREE.VertexNormalsHelper = function ( object, size, hex, linewidth ) {
 
 	this.object = object;
 
-	this.size = ( size !== undefined ) ? size : 1;
+	this.size = size || 1;
 
-	var color = ( hex !== undefined ) ? hex : 0xff0000;
+	var color = hex || 0xff0000;
 
-	var width = ( linewidth !== undefined ) ? linewidth : 1;
+	var width = linewidth || 1;
 
 	var geometry = new THREE.Geometry();
 
@@ -35081,11 +34909,11 @@ THREE.VertexTangentsHelper = function ( object, size, hex, linewidth ) {
 
 	this.object = object;
 
-	this.size = ( size !== undefined ) ? size : 1;
+	this.size = size || 1;
 
-	var color = ( hex !== undefined ) ? hex : 0x0000ff;
+	var color = hex || 0x0000ff;
 
-	var width = ( linewidth !== undefined ) ? linewidth : 1;
+	var width = linewidth || 1;
 
 	var geometry = new THREE.Geometry();
 
@@ -35173,24 +35001,22 @@ THREE.VertexTangentsHelper.prototype.update = ( function ( object ) {
  * @author mrdoob / http://mrdoob.com/
  */
 
-THREE.WireframeHelper = function ( object, hex ) {
-
-	var color = ( hex !== undefined ) ? hex : 0xffffff;
+THREE.WireframeHelper = function ( object ) {
 
 	var edge = [ 0, 0 ], hash = {};
 	var sortFunction = function ( a, b ) { return a - b };
 
-	var keys = [ 'a', 'b', 'c' ];
+	var keys = [ 'a', 'b', 'c', 'd' ];
 	var geometry = new THREE.BufferGeometry();
+	var numEdges = 0;
 
 	if ( object.geometry instanceof THREE.Geometry ) {
 
 		var vertices = object.geometry.vertices;
 		var faces = object.geometry.faces;
-		var numEdges = 0;
 
 		// allocate maximal size
-		var edges = new Uint32Array( 6 * faces.length );
+		var edges = new Uint32Array(6 * faces.length);
 
 		for ( var i = 0, l = faces.length; i < l; i ++ ) {
 
@@ -35217,8 +35043,7 @@ THREE.WireframeHelper = function ( object, hex ) {
 
 		}
 
-		geometry.addAttribute( 'position', Float32Array, 2 * numEdges, 3 );
-
+		geometry.addAttribute( 'position', Float32Array, 2 * numEdges , 3 );
 		var coords = geometry.attributes.position.array;
 
 		for ( var i = 0, l = numEdges; i < l; i ++ ) {
@@ -35236,40 +35061,32 @@ THREE.WireframeHelper = function ( object, hex ) {
 
 		}
 
-	} else if ( object.geometry instanceof THREE.BufferGeometry && object.geometry.attributes.index !== undefined ) { // indexed BufferGeometry
+	} else {
 
 		var vertices = object.geometry.attributes.position.array;
-		var indices = object.geometry.attributes.index.array;
-		var offsets = object.geometry.offsets;
-		var numEdges = 0;
+		var faces = object.geometry.attributes.index.array;
 
 		// allocate maximal size
-		var edges = new Uint32Array( 2 * indices.length );
+		var edges = new Uint32Array(2 * faces.length);
 
-		for ( var o = 0, ol = offsets.length; o < ol; ++ o ) {
+		for ( var i = 0, l = faces.length / 3; i < l; i ++ ) {
 
-			var start = offsets[ o ].start;
-			var count = offsets[ o ].count;
-			var index = offsets[ o ].index;
+			for ( var j = 0; j < 3; j ++ ) {
 
-			for ( var i = start, il = start + count; i < il; i += 3 ) {
+				var index = i * 3;
 
-				for ( var j = 0; j < 3; j ++ ) {
+				edge[ 0 ] = faces[ index + j ];
+				edge[ 1 ] = faces[ index + ( j + 1 ) % 3 ];
+				edge.sort( sortFunction );
 
-					edge[ 0 ] = index + indices[ i + j ];
-					edge[ 1 ] = index + indices[ i + ( j + 1 ) % 3 ];
-					edge.sort( sortFunction );
+				var key = edge.toString();
 
-					var key = edge.toString();
+				if ( hash[ key ] === undefined ) {
 
-					if ( hash[ key ] === undefined ) {
-
-						edges[ 2 * numEdges ] = edge[ 0 ];
-						edges[ 2 * numEdges + 1 ] = edge[ 1 ];
-						hash[ key ] = true;
-						numEdges ++;
-
-					}
+					edges[ 2 * numEdges ] = edge[ 0 ];
+					edges[ 2 * numEdges + 1 ] = edge[ 1 ];
+					hash[ key ] = true;
+					numEdges ++;
 
 				}
 
@@ -35277,7 +35094,7 @@ THREE.WireframeHelper = function ( object, hex ) {
 
 		}
 
-		geometry.addAttribute( 'position', Float32Array, 2 * numEdges, 3 );
+		geometry.addAttribute( 'position', Float32Array, 2 * numEdges , 3 );
 
 		var coords = geometry.attributes.position.array;
 
@@ -35294,40 +35111,9 @@ THREE.WireframeHelper = function ( object, hex ) {
 			}
 
 		}
-
-	} else if ( object.geometry instanceof THREE.BufferGeometry	) { // non-indexed BufferGeometry
-
-		var vertices = object.geometry.attributes.position.array;
-		var numEdges = vertices.length / 3;
-		var numTris = numEdges / 3;
-
-		geometry.addAttribute( 'position', Float32Array, 2 * numEdges, 3 );
-
-		var coords = geometry.attributes.position.array;
-
-		for ( var i = 0, l = numTris; i < l; i ++ ) {
-
-			for ( var j = 0; j < 3; j ++ ) {
-
-				var index = 18 * i + 6 * j;
-
-				var index1 = 9 * i + 3 * j;
-				coords[ index + 0 ] = vertices[ index1 ];
-				coords[ index + 1 ] = vertices[ index1 + 1 ];
-				coords[ index + 2 ] = vertices[ index1 + 2 ];
-
-				var index2 = 9 * i + 3 * ( ( j + 1 ) % 3 );
-				coords[ index + 3 ] = vertices[ index2 ];
-				coords[ index + 4 ] = vertices[ index2 + 1 ];
-				coords[ index + 5 ] = vertices[ index2 + 2 ];
-
-			}
-
-		}
-
 	}
 
-	THREE.Line.call( this, geometry, new THREE.LineBasicMaterial( { color: color } ), THREE.LinePieces );
+	THREE.Line.call( this, geometry, new THREE.LineBasicMaterial( { color: 0xffffff } ), THREE.LinePieces );
 
 	this.matrixAutoUpdate = false;
 	this.matrixWorld = object.matrixWorld;
@@ -36745,17 +36531,8 @@ THREE.SpritePlugin = function () {
 
 			}
 
-			if ( material.map !== null ) {
-
-				_gl.uniform2f( uniforms.uvOffset, material.map.offset.x, material.map.offset.y );
-				_gl.uniform2f( uniforms.uvScale, material.map.repeat.x, material.map.repeat.y );
-
-			} else {
-
-				_gl.uniform2f( uniforms.uvOffset, 0, 0 );
-				_gl.uniform2f( uniforms.uvScale, 1, 1 );
-
-			}
+			_gl.uniform2f( uniforms.uvScale, material.uvScale.x, material.uvScale.y );
+			_gl.uniform2f( uniforms.uvOffset, material.uvOffset.x, material.uvOffset.y );
 
 			_gl.uniform1f( uniforms.opacity, material.opacity );
 			_gl.uniform3f( uniforms.color, material.color.r, material.color.g, material.color.b );
