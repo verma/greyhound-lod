@@ -8,7 +8,7 @@ var
 
 var
 	port = process.env.PORT || 8000,
-	dataInfo = require("./data/meta.json");
+	dataInfo = require("../data/meta.json");
 
 function endsWith(str, suffix) {
     return str.indexOf(suffix, str.length - suffix.length) !== -1;
@@ -77,7 +77,7 @@ var handlePointRequest = function(url, req, res) {
 
 			var fn = "data." + x + "." + z + "." +
 				(x+w) + "." + (z+h);
-			var p = path.join("./data", fn);
+			var p = path.join("../data", fn);
 
 			return fs.stat(p, function(err, stats) {
 				if(err) return fourOhFour(res);
@@ -123,7 +123,7 @@ var go = function() {
 	console.log('    terrrain size:', dataInfo.terrainSize);
 	console.log('        leaf size:', dataInfo.leafSize);
 
-	checkTree('./data', dataInfo.terrainSize, dataInfo.leafSize);
+	checkTree('../data', dataInfo.terrainSize, dataInfo.leafSize);
 	console.log('Data tree looks good.');
 
 	var server = http.createServer(function(req, res) {
